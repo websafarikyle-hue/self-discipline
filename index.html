@@ -655,7 +655,8 @@
                     <div class="quick-add">
                         <input id="quick-title" data-testid="quick-input-title" placeholder="任务名称">
                         <select id="quick-goal" data-testid="quick-select-goal"></select>
-                        <input id="quick-pts" data-testid="quick-input-pts" type="number" min="0" value="10" placeholder="积分" style="max-width:80px;">
+                        <input id="quick-pts" data-testid="quick-input-pts" type="number" min="0" value="10"
+                            placeholder="积分" style="max-width:80px;">
                         <input id="quick-deadline" data-testid="quick-input-deadline" type="date">
                         <button id="quick-add-btn" data-testid="quick-btn-add">添加</button>
                     </div>
@@ -869,7 +870,8 @@
             if (data && data.data) {
                 try {
                     const cloudData = JSON.parse(data.data);
-                    if (cloudData.goals && cloudData.tasks && cloudData.rewards) {
+                    if (cloudData.goals && cloudData.tasks && cloudData.rewards &&
+                        (cloudData.tasks.length > 0 || cloudData.goals.length > 0)) {
                         S = cloudData;
                         if (!S.pointsLog) S.pointsLog = [];
                         if (!S.redemptions) S.redemptions = [];
@@ -907,41 +909,10 @@
             { id: "r5", name: "200餐", cost: 420, stock: 20, redeemedCount: 0, type: "里程碑奖励", note: "" }
         ];
 
-        /* --- 默认目标 --- */
-        const DEFAULT_GOALS = [
-            { id: "g1", name: "示例目标", tag: "", milestone: 100, progress: 0 }
-        ];
-
-        /* --- 默认任务模板 --- */
-        function seedTasks(goals) {
-            const now = new Date();
-            const tpl = [
-                ["AI论文精读30min", "g1", "P1", "habit", "reading", "30min", 8, 1],
-                ["晨跑30分钟", "g4", "P0", "habit", "exercise", "30min", 10, 1],
-                ["晚间深度阅读1h", "g1", "P1", "habit", "reading", "1h", 15, 1],
-                ["力量训练1h", "g4", "P2", "habit", "exercise", "1h", 20, 1],
-                ["Web3项目推进90min", "g2", "P0", "normal", "general", "1h", 16, 1.2],
-                ["量化策略回测", "g3", "P1", "normal", "general", "1h", 18, 1.5],
-                ["英语论文写作", "g4", "P2", "normal", "general", "30min", 10, 1],
-                ["睡前复盘总结", "g1", "P3", "habit", "general", "30min", 10, 1]
-            ];
-            return tpl.map((t, i) => {
-                const d = new Date(now); d.setDate(now.getDate() + (i % 5)); d.setHours(20, 30, 0, 0);
-                return {
-                    id: uid(), title: t[0], goalId: t[1], priority: t[2],
-                    status: "未开始", type: t[3], category: t[4], duration: t[5],
-                    basePoints: t[6], weight: t[7], progress: 0,
-                    outputUrl: "", note: "", deadline: d.toISOString(),
-                    streak: 0, lastDoneDate: null,
-                    createdAt: now.toISOString(), updatedAt: now.toISOString()
-                };
-            });
-        }
-
         function seedState() {
             return {
-                goals: structuredClone(DEFAULT_GOALS),
-                tasks: seedTasks(DEFAULT_GOALS),
+                goals: [],
+                tasks: [],
                 rewards: structuredClone(DEFAULT_REWARDS),
                 redemptions: [],
                 pointsLog: []
@@ -957,7 +928,11 @@
                 const raw = localStorage.getItem(STORAGE_KEY);
                 if (raw) {
                     const p = JSON.parse(raw);
-                    if (p.goals && p.tasks && p.rewards && p.redemptions) return p;
+                    if (p.goals && p.tasks && p.rewards) {
+                        if (!p.redemptions) p.redemptions = [];
+                        if (!p.pointsLog) p.pointsLog = [];
+                        return p;
+                    }
                 }
             } catch (_) { }
             return seedState();
@@ -989,7 +964,7 @@
             if (!iso) return "未设置";
             return new Date(iso).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
         }
-        function todayStr() { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; }
+        function todayStr() { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
         function nowTimeStr() { const d = new Date(); return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
 
         /* --- Toast（替代 alert/confirm） --- */
@@ -1725,7 +1700,7 @@
             const { earned, spent, balance } = totals();
             const now = new Date();
             const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 7);
-            const weekAgoStr = `${weekAgo.getFullYear()}-${pad2(weekAgo.getMonth()+1)}-${pad2(weekAgo.getDate())}`;
+            const weekAgoStr = `${weekAgo.getFullYear()}-${pad2(weekAgo.getMonth() + 1)}-${pad2(weekAgo.getDate())}`;
             const weekTasks = S.tasks.filter(t => t.status === "已封包(Done)" && t.updatedAt && new Date(t.updatedAt) >= weekAgo);
             const weekTaskPts = weekTasks.reduce((s, t) => s + calcActualPoints(t), 0);
             const weekManual = S.pointsLog.filter(l => (l.type === "manual" || l.type === "milestone") && l.time && new Date(l.time) >= weekAgo);
