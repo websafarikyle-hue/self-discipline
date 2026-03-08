@@ -809,6 +809,8 @@
             try {
                 const stored = JSON.parse(localStorage.getItem(SUPA_CONFIG_KEY));
                 if (stored && stored.url && stored.key && stored.userSaved) return stored;
+                /* 清理旧格式配置（无 userSaved 标记的） */
+                if (stored && !stored.userSaved) localStorage.removeItem(SUPA_CONFIG_KEY);
             } catch (_) { }
             return null;
         }
