@@ -660,6 +660,7 @@
                     <div class="quick-add">
                         <input id="quick-title" data-testid="quick-input-title" placeholder="任务名称">
                         <select id="quick-goal" data-testid="quick-select-goal"></select>
+                        <input id="quick-pts" data-testid="quick-input-pts" type="number" min="0" value="10" placeholder="积分" style="max-width:80px;">
                         <input id="quick-deadline" data-testid="quick-input-deadline" type="date">
                         <button id="quick-add-btn" data-testid="quick-btn-add">添加</button>
                     </div>
@@ -719,6 +720,28 @@
                             placeholder="积分">
                     </div>
                     <button id="manual-pts-btn" data-testid="manual-pts-btn" style="margin-top:8px;">➕ 加分</button>
+                </div>
+                <div class="card">
+                    <h2>🎁 新增 / 编辑奖励</h2>
+                    <div class="form-grid">
+                        <input id="reward-name" data-testid="reward-input-name" placeholder="奖励名称">
+                        <input id="reward-cost" data-testid="reward-input-cost" type="number" min="1" value="30"
+                            placeholder="积分成本">
+                        <input id="reward-stock" data-testid="reward-input-stock" type="number" min="1" value="99"
+                            placeholder="库存">
+                        <select id="reward-type" data-testid="reward-select-type">
+                            <option value="即时奖励">即时奖励</option>
+                            <option value="长线奖励">长线奖励</option>
+                            <option value="里程碑奖励">里程碑奖励</option>
+                        </select>
+                    </div>
+                    <input id="reward-note" data-testid="reward-input-note" placeholder="备注(可选)"
+                        style="margin-top:8px;">
+                    <div class="row wrap" style="margin-top:10px;">
+                        <button id="reward-save" data-testid="reward-btn-save">保存奖励</button>
+                        <button id="reward-clear" data-testid="reward-btn-clear" class="secondary">清空</button>
+                        <input id="reward-edit-id" type="hidden" value="">
+                    </div>
                 </div>
                 <div class="card">
                     <h2>💎 补给站</h2>
@@ -974,7 +997,8 @@
             if (!iso) return "未设置";
             return new Date(iso).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
         }
-        function todayStr() { return new Date().toISOString().slice(0, 10); }
+        function todayStr() { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; }
+        function nowTimeStr() { const d = new Date(); return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
 
         /* --- Toast（替代 alert/confirm） --- */
         function toast(msg, type = "ok") {
@@ -1028,7 +1052,9 @@
         }
         function goalStatus(goalId) { return goalProgress(goalId) >= 100 ? "已达成" : "推进中"; }
         function totals() {
-            const earned = S.tasks.reduce((s, t) => s + calcActualPoints(t), 0);
+            const taskPts = S.tasks.reduce((s, t) => s + calcActualPoints(t), 0);
+            const manualPts = S.pointsLog.filter(l => l.type === "manual" || l.type === "milestone").reduce((s, l) => s + l.points, 0);
+            const earned = taskPts + manualPts;
             const spent = S.redemptions.reduce((s, r) => s + r.cost, 0);
             return { earned, spent, balance: earned - spent };
         }
@@ -1041,8 +1067,10 @@
            =================================================== */
         function renderGoals() {
             const list = $("goalList");
-            if (!S.goals.length) { list.innerHTML = '<p class="muted">暂无目标，请先添加</p>'; return; }
-            list.innerHTML = S.goals.map(g => {
+            const activeGoals = S.goals.filter(g => !g.archived);
+            const archivedGoals = S.goals.filter(g => g.archived);
+            if (!activeGoals.length && !archivedGoals.length) { list.innerHTML = '<p class="muted">暂无目标，请先添加</p>'; return; }
+            let html = activeGoals.map(g => {
                 const prog = Number(g.progress || 0);
                 const st = goalStatus(g.id);
                 const taskCount = S.tasks.filter(t => t.goalId === g.id).length;
@@ -1063,12 +1091,37 @@
                 <div class="row between center" style="margin-top:6px;">
                     <span class="muted">${taskCount}个关联任务</span>
                     <div class="row" style="gap:6px;">
+                        ${prog >= 100 ? `<button onclick="archiveGoal('${g.id}')" class="ok-btn" style="padding:4px 10px;font-size:12px;">归档</button>` : ''}
                         <button data-testid="goal-btn-edit-${g.id}" onclick="editGoal('${g.id}')" class="secondary" style="padding:4px 10px;font-size:12px;">编辑</button>
                         <button data-testid="goal-btn-del-${g.id}" onclick="deleteGoal('${g.id}')" class="danger" style="padding:4px 10px;font-size:12px;">删除</button>
                     </div>
                 </div>
             </div>`;
             }).join("");
+            if (archivedGoals.length) {
+                html += `<div class="group-header" style="cursor:pointer;" onclick="document.getElementById('archivedGoalsList').classList.toggle('hidden')">📦 已归档目标 (${archivedGoals.length}) ▾</div>`;
+                html += `<div id="archivedGoalsList">`;
+                html += archivedGoals.map(g => {
+                    const taskCount = S.tasks.filter(t => t.goalId === g.id).length;
+                    return `<div class="item-card" style="opacity:0.7;">
+                    <div class="row between center">
+                        <strong>${esc(g.name)}</strong>
+                        <span class="pill pill-ok">已归档</span>
+                    </div>
+                    <div style="margin:4px 0;">
+                        <span class="pill pill-muted">${g.track}</span>
+                        <span class="pill pill-muted">${taskCount}个任务</span>
+                        ${g.archivedAt ? `<span class="muted" style="font-size:11px;">归档于 ${fmtDate(g.archivedAt)}</span>` : ''}
+                    </div>
+                    <div class="row" style="margin-top:6px;gap:6px;">
+                        <button onclick="restoreGoal('${g.id}')" class="secondary" style="padding:4px 10px;font-size:12px;">恢复</button>
+                        <button onclick="deleteGoal('${g.id}')" class="danger" style="padding:4px 10px;font-size:12px;">删除</button>
+                    </div>
+                </div>`;
+                }).join("");
+                html += `</div>`;
+            }
+            list.innerHTML = html;
         }
 
         function updateGoalProgress(goalId, val) {
@@ -1135,7 +1188,7 @@
 
         /* 刷新任务表单中的目标下拉 */
         function refreshGoalSelects() {
-            const opts = '<option value="">-- 选择目标 --</option>' + S.goals.map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join("");
+            const opts = '<option value="">-- 选择目标 --</option>' + S.goals.filter(g => !g.archived).map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join("");
             $("task-goal").innerHTML = opts;
             $("quick-goal").innerHTML = opts;
         }
@@ -1146,7 +1199,13 @@
             const prog = goalProgress(goalId);
             if (prog >= 100) {
                 const g = S.goals.find(x => x.id === goalId);
-                if (!g) return;
+                if (!g || g.milestoneAwarded) return;
+                /* 发放里程碑积分（只发一次） */
+                if (g.milestone > 0) {
+                    S.pointsLog.push({ time: new Date().toISOString(), taskId: null, taskTitle: "目标达成奖: " + g.name, points: g.milestone, type: "milestone" });
+                    g.milestoneAwarded = true;
+                    saveState();
+                }
                 const overlay = document.createElement("div");
                 overlay.className = "modal-overlay";
                 overlay.id = "modalOverlay";
@@ -1154,15 +1213,40 @@
                 <h2 style="font-size:28px;">🎉🏆🎉</h2>
                 <h2 style="color:var(--accent2);">目标达成！</h2>
                 <p style="margin:12px 0;">「${esc(g.name)}」综合进度 100%</p>
-                <p class="muted">奖励 ${g.milestone} 大奖积分！</p>
-                <button onclick="closeModal(true)" style="margin-top:16px;">太棒了！</button>
+                <p class="muted">已奖励 ${g.milestone} 大奖积分！</p>
+                <div class="row" style="margin-top:16px;gap:8px;justify-content:center;">
+                    <button onclick="archiveGoal('${g.id}');closeModal(true)" class="ok-btn">归档目标</button>
+                    <button onclick="closeModal(true)" class="secondary">先留着</button>
+                </div>
             </div>`;
                 document.body.appendChild(overlay);
             }
         }
 
+        /* 归档目标 */
+        async function archiveGoal(id) {
+            const g = S.goals.find(x => x.id === id);
+            if (!g) return;
+            g.archived = true;
+            g.archivedAt = new Date().toISOString();
+            saveState(); renderGoals();
+            toast("目标「" + g.name + "」已归档");
+        }
+
+        /* 恢复目标 */
+        function restoreGoal(id) {
+            const g = S.goals.find(x => x.id === id);
+            if (!g) return;
+            g.archived = false;
+            g.archivedAt = null;
+            saveState(); renderGoals();
+            toast("目标已恢复");
+        }
+
         window.editGoal = editGoal;
         window.deleteGoal = deleteGoal;
+        window.archiveGoal = archiveGoal;
+        window.restoreGoal = restoreGoal;
 
         /* ===================================================
            Step 4: 任务清单 CRUD + 渲染 + 打卡连签 + 快速添加
@@ -1300,10 +1384,11 @@
             if (!title) { toast("请输入任务名", "warn"); return; }
             const goalId = $("quick-goal").value;
             const dl = $("quick-deadline").value;
+            const pts = Number($("quick-pts").value) || 10;
             S.tasks.push({
                 id: uid(), title, goalId, priority: "P2", status: "未开始",
                 type: "normal", category: "general", duration: "30min",
-                progress: 0, basePoints: 10, weight: 1,
+                progress: 0, basePoints: pts, weight: 1,
                 deadline: dl ? new Date(dl + "T20:30:00").toISOString() : null,
                 outputUrl: "", note: "", streak: 0, lastDoneDate: null,
                 createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
@@ -1566,21 +1651,35 @@
             const { earned, spent, balance } = totals();
             const today = todayStr();
             const todayDone = S.tasks.filter(t => t.status === "已封包(Done)" && t.updatedAt && t.updatedAt.startsWith(today));
-            const todayPts = todayDone.reduce((s, t) => s + calcActualPoints(t), 0);
+            const todayTaskPts = todayDone.reduce((s, t) => s + calcActualPoints(t), 0);
+            const todayManual = S.pointsLog.filter(l => (l.type === "manual" || l.type === "milestone") && l.time && l.time.startsWith(today));
+            const todayManualPts = todayManual.reduce((s, l) => s + l.points, 0);
+            const todaySpend = S.pointsLog.filter(l => l.type === "spend" && l.time && l.time.startsWith(today));
+            const todaySpendPts = todaySpend.reduce((s, l) => s + Math.abs(l.points), 0);
+            const todayTotalPts = todayTaskPts + todayManualPts;
             const lines = [
-                `📊 每日复盘 - ${today}`,
+                `📊 每日复盘 - ${today} ${nowTimeStr()}`,
                 `━━━━━━━━━━━━━━━━━━`,
                 `今日完成任务: ${todayDone.length}`,
                 ...todayDone.map(t => `  ✅ ${t.title} (+${calcActualPoints(t)}分)`),
-                `今日获得积分: ${todayPts}`,
+            ];
+            if (todayManual.length) {
+                lines.push(`今日额外积分:`);
+                todayManual.forEach(l => lines.push(`  ✨ ${l.taskTitle} (+${l.points}分)`));
+            }
+            if (todaySpend.length) {
+                lines.push(`今日兑换消费: -${todaySpendPts}分`);
+            }
+            lines.push(
+                `今日获得积分: ${todayTotalPts}`,
                 `累计获得: ${earned} | 累计消费: ${spent} | 余额: ${balance}`,
                 `━━━━━━━━━━━━━━━━━━`,
                 `目标进度:`,
-                ...S.goals.map(g => `  🎯 ${g.name}: ${goalProgress(g.id)}% (${goalStatus(g.id)})`),
+                ...S.goals.filter(g => !g.archived).map(g => `  🎯 ${g.name}: ${goalProgress(g.id)}% (${goalStatus(g.id)})`),
                 `━━━━━━━━━━━━━━━━━━`,
                 `可兑换:`,
                 ...S.rewards.filter(r => balance >= r.cost && r.stock > r.redeemedCount).map(r => `  🎁 ${r.name} (${r.cost}分)`),
-            ];
+            );
             $("reviewOutput").value = lines.join("\n");
         }
 
@@ -1588,24 +1687,35 @@
             const { earned, spent, balance } = totals();
             const now = new Date();
             const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 7);
+            const weekAgoStr = `${weekAgo.getFullYear()}-${pad2(weekAgo.getMonth()+1)}-${pad2(weekAgo.getDate())}`;
             const weekTasks = S.tasks.filter(t => t.status === "已封包(Done)" && t.updatedAt && new Date(t.updatedAt) >= weekAgo);
-            const weekPts = weekTasks.reduce((s, t) => s + calcActualPoints(t), 0);
+            const weekTaskPts = weekTasks.reduce((s, t) => s + calcActualPoints(t), 0);
+            const weekManual = S.pointsLog.filter(l => (l.type === "manual" || l.type === "milestone") && l.time && new Date(l.time) >= weekAgo);
+            const weekManualPts = weekManual.reduce((s, l) => s + l.points, 0);
+            const weekTotalPts = weekTaskPts + weekManualPts;
             const lines = [
-                `📊 周报 - ${weekAgo.toISOString().slice(0, 10)} ~ ${todayStr()}`,
+                `📊 周报 - ${weekAgoStr} ~ ${todayStr()} ${nowTimeStr()}`,
                 `━━━━━━━━━━━━━━━━━━`,
                 `本周完成任务: ${weekTasks.length}`,
-                `本周获得积分: ${weekPts}`,
+                `本周任务积分: ${weekTaskPts}`,
+            ];
+            if (weekManual.length) {
+                lines.push(`本周额外积分: +${weekManualPts}`);
+                weekManual.forEach(l => lines.push(`  ✨ ${l.taskTitle} (+${l.points}分)`));
+            }
+            lines.push(
+                `本周总获得积分: ${weekTotalPts}`,
                 `累计获得: ${earned} | 累计消费: ${spent} | 余额: ${balance}`,
                 `━━━━━━━━━━━━━━━━━━`,
-                `目标进度变动:`,
-                ...S.goals.map(g => `  🎯 ${g.name}: ${goalProgress(g.id)}% (${goalStatus(g.id)})`),
+                `目标进度:`,
+                ...S.goals.filter(g => !g.archived).map(g => `  🎯 ${g.name}: ${goalProgress(g.id)}% (${goalStatus(g.id)})`),
                 `━━━━━━━━━━━━━━━━━━`,
                 `本周完成明细:`,
                 ...weekTasks.map(t => `  ✅ ${t.title} (+${calcActualPoints(t)}分)`),
                 `━━━━━━━━━━━━━━━━━━`,
                 `习惯连签:`,
                 ...S.tasks.filter(t => t.type === "habit" && t.streak > 0).map(t => `  🔥 ${t.title}: ${t.streak}天`),
-            ];
+            );
             $("reviewOutput").value = lines.join("\n");
         }
 
@@ -1754,6 +1864,20 @@
                 return;
             }
             await cloudRegister(email, pw);
+        });
+
+        /* 手动加分 */
+        $("manual-pts-btn").addEventListener("click", function () {
+            const reason = $("manual-pts-reason").value.trim();
+            const amount = Number($("manual-pts-amount").value) || 0;
+            if (!reason) { toast("请填写加分原因", "warn"); return; }
+            if (amount <= 0) { toast("积分需大于0", "warn"); return; }
+            S.pointsLog.push({ time: new Date().toISOString(), taskId: null, taskTitle: "手动加分: " + reason, points: amount, type: "manual" });
+            saveState();
+            $("manual-pts-reason").value = "";
+            $("manual-pts-amount").value = 10;
+            renderReview();
+            toast("✅ 已加 " + amount + " 分");
         });
 
         /* 奖励 CRUD */
