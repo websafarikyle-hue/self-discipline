@@ -306,6 +306,35 @@
             transition: width .4s ease;
         }
 
+        /* Slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255,255,255,0.12);
+            outline: none;
+            border: none;
+            padding: 0;
+            margin: 6px 0;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            cursor: pointer;
+        }
+        input[type=range]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            cursor: pointer;
+            border: none;
+        }
+
         /* Progress Ring (SVG) */
         .ring-wrap {
             position: relative;
@@ -600,10 +629,12 @@
                             <option value="量化金融">量化金融</option>
                             <option value="学术学位">学术学位</option>
                         </select>
-                        <input id="goal-weight" data-testid="goal-input-weight" type="number" min="0" max="100"
-                            value="50" placeholder="总权重 0-100">
                         <input id="goal-milestone" data-testid="goal-input-milestone" type="number" min="0" value="0"
-                            placeholder="阶段性大奖积分">
+                            placeholder="达成奖励积分">
+                    </div>
+                    <div style="margin-top:8px;">
+                        <label class="muted" style="font-size:12px;">目标进度: <span id="goal-progress-val">0</span>%</label>
+                        <input id="goal-progress" data-testid="goal-input-progress" type="range" min="0" max="100" value="0" oninput="$('goal-progress-val').textContent=this.value">
                     </div>
                     <div class="row wrap" style="margin-top:10px;">
                         <button id="goal-save" data-testid="goal-btn-save">保存目标</button>
@@ -632,7 +663,7 @@
                 <!-- 完整表单 -->
                 <div class="card">
                     <h2>✅ 新增 / 编辑任务</h2>
-                    <div class="form-grid form-grid-3">
+                    <div class="form-grid">
                         <input id="task-title" data-testid="task-input-title" placeholder="任务名称">
                         <select id="task-goal" data-testid="task-select-goal"></select>
                         <select id="task-priority" data-testid="task-select-priority">
@@ -641,36 +672,17 @@
                             <option value="P2" selected>P2 - 一般</option>
                             <option value="P3">P3 - 低</option>
                         </select>
-                        <select id="task-status" data-testid="task-select-status">
-                            <option value="未开始">未开始</option>
-                            <option value="进行中">进行中</option>
-                            <option value="已封包(Done)">已封包(Done)</option>
-                            <option value="已挂起">已挂起</option>
-                        </select>
-                        <select id="task-type" data-testid="task-select-type">
-                            <option value="habit">习惯</option>
-                            <option value="normal">普通</option>
-                        </select>
-                        <select id="task-category" data-testid="task-select-category">
-                            <option value="reading">阅读</option>
-                            <option value="exercise">锻炼</option>
-                            <option value="general">通用</option>
-                        </select>
-                        <select id="task-duration" data-testid="task-select-duration">
-                            <option value="30min">30min</option>
-                            <option value="1h">1h</option>
-                        </select>
-                        <input id="task-progress" data-testid="task-input-progress" type="number" min="0" max="100"
-                            value="0" placeholder="完成进度 0-100">
                         <input id="task-base" data-testid="task-input-base" type="number" min="0" value="10"
-                            placeholder="基础分值">
-                        <input id="task-weight" data-testid="task-input-weight" type="number" min="0.1" step="0.1"
-                            value="1.0" placeholder="权重系数">
+                            placeholder="完成可得积分">
                         <input id="task-deadline" data-testid="task-input-deadline" type="datetime-local">
-                        <input id="task-output" data-testid="task-input-output" placeholder="产出物链接(URL)">
                     </div>
-                    <textarea id="task-note" data-testid="task-input-note" placeholder="备注（执行思路/卡点/心得）" rows="2"
+                    <div style="margin-top:8px;">
+                        <label class="muted" style="font-size:12px;">执行进度: <span id="task-progress-val">0</span>%</label>
+                        <input id="task-progress" data-testid="task-input-progress" type="range" min="0" max="100" value="0" oninput="$('task-progress-val').textContent=this.value">
+                    </div>
+                    <textarea id="task-note" data-testid="task-input-note" placeholder="备注" rows="2"
                         style="margin-top:8px;"></textarea>
+                    <input id="task-output" data-testid="task-input-output" placeholder="产出物链接(可选)" style="margin-top:6px;">
                     <div class="row wrap" style="margin-top:10px;">
                         <button id="task-save" data-testid="task-btn-save">保存任务</button>
                         <button id="task-clear" data-testid="task-btn-clear" class="secondary">清空</button>
@@ -692,7 +704,16 @@
             <!-- ===== Tab3: 补给站 ===== -->
             <section id="pageShop" data-testid="page-shop" class="hidden">
                 <div class="card">
-                    <h2>💎 补给站 & 勋章墙</h2>
+                    <h2>� 手动加分</h2>
+                    <p class="muted" style="margin-bottom:6px;">完成计划外的事也值得奖励自己</p>
+                    <div class="form-grid">
+                        <input id="manual-pts-reason" data-testid="manual-pts-reason" placeholder="加分原因">
+                        <input id="manual-pts-amount" data-testid="manual-pts-amount" type="number" min="1" value="10" placeholder="积分">
+                    </div>
+                    <button id="manual-pts-btn" data-testid="manual-pts-btn" style="margin-top:8px;">➕ 加分</button>
+                </div>
+                <div class="card">
+                    <h2>💎 补给站</h2>
                     <p class="muted">余额积分 ≥ 成本 且 库存 > 0 才可兑换</p>
                     <div id="rewardList" data-testid="shop-reward-list"></div>
                 </div>
@@ -761,7 +782,7 @@
             try {
                 const stored = JSON.parse(localStorage.getItem(SUPA_CONFIG_KEY));
                 if (stored && stored.url && stored.key) return stored;
-            } catch (_) {}
+            } catch (_) { }
             return { url: DEFAULT_SUPA_URL, key: DEFAULT_SUPA_KEY };
         }
         function saveSupaConfig(url, key) {
@@ -862,10 +883,10 @@
 
         /* --- 默认目标 --- */
         const DEFAULT_GOALS = [
-            { id: "g1", name: "AI 技术精进", track: "AI", weight: 80, milestone: 200 },
-            { id: "g2", name: "Web3 探索", track: "Web3", weight: 60, milestone: 150 },
-            { id: "g3", name: "量化策略研发", track: "量化金融", weight: 70, milestone: 180 },
-            { id: "g4", name: "学位论文推进", track: "学术学位", weight: 90, milestone: 250 }
+            { id: "g1", name: "AI 技术精进", track: "AI", milestone: 200, progress: 0 },
+            { id: "g2", name: "Web3 探索", track: "Web3", milestone: 150, progress: 0 },
+            { id: "g3", name: "量化策略研发", track: "量化金融", milestone: 180, progress: 0 },
+            { id: "g4", name: "学位论文推进", track: "学术学位", milestone: 250, progress: 0 }
         ];
 
         /* --- 默认任务模板 --- */
@@ -978,7 +999,7 @@
         /* --- 业务计算 --- */
         function calcActualPoints(t) {
             if (t.status !== "已封包(Done)") return 0;
-            return Math.max(0, Math.round(Number(t.basePoints || 0) * Number(t.weight || 1)));
+            return Math.max(0, Number(t.basePoints || 0));
         }
         function getTimeWindow(deadline) {
             if (!deadline) return "06_未设截止";
@@ -994,9 +1015,8 @@
             return m[tw] || tw;
         }
         function goalProgress(goalId) {
-            const tasks = S.tasks.filter(t => t.goalId === goalId);
-            if (!tasks.length) return 0;
-            return Math.round(tasks.reduce((s, t) => s + Number(t.progress || 0), 0) / tasks.length);
+            const g = S.goals.find(x => x.id === goalId);
+            return g ? Number(g.progress || 0) : 0;
         }
         function goalStatus(goalId) { return goalProgress(goalId) >= 100 ? "已达成" : "推进中"; }
         function totals() {
@@ -1015,7 +1035,7 @@
             const list = $("goalList");
             if (!S.goals.length) { list.innerHTML = '<p class="muted">暂无目标，请先添加</p>'; return; }
             list.innerHTML = S.goals.map(g => {
-                const prog = goalProgress(g.id);
+                const prog = Number(g.progress || 0);
                 const st = goalStatus(g.id);
                 const taskCount = S.tasks.filter(t => t.goalId === g.id).length;
                 return `<div class="item-card" data-testid="goal-card-${g.id}">
@@ -1025,13 +1045,15 @@
                 </div>
                 <div style="margin:4px 0;">
                     <span class="pill pill-muted">${g.track}</span>
-                    <span class="pill pill-muted">权重 ${g.weight}</span>
-                    <span class="pill pill-muted">大奖 ${g.milestone}分</span>
+                    <span class="pill pill-muted">达成奖 ${g.milestone}分</span>
                     <span class="pill pill-muted">${taskCount}个任务</span>
                 </div>
-                <div class="progress-bar"><div class="progress-fill" style="width:${prog}%"></div></div>
-                <div class="row between center">
-                    <span class="muted">综合进度 ${prog}%</span>
+                <div class="row center" style="gap:8px;">
+                    <input type="range" min="0" max="100" value="${prog}" style="flex:1;" oninput="updateGoalProgress('${g.id}',this.value)" data-testid="goal-slider-${g.id}">
+                    <span style="min-width:40px;text-align:right;font-weight:700;">${prog}%</span>
+                </div>
+                <div class="row between center" style="margin-top:6px;">
+                    <span class="muted">${taskCount}个关联任务</span>
                     <div class="row" style="gap:6px;">
                         <button data-testid="goal-btn-edit-${g.id}" onclick="editGoal('${g.id}')" class="secondary" style="padding:4px 10px;font-size:12px;">编辑</button>
                         <button data-testid="goal-btn-del-${g.id}" onclick="deleteGoal('${g.id}')" class="danger" style="padding:4px 10px;font-size:12px;">删除</button>
@@ -1041,6 +1063,15 @@
             }).join("");
         }
 
+        function updateGoalProgress(goalId, val) {
+            const g = S.goals.find(x => x.id === goalId);
+            if (!g) return;
+            g.progress = Number(val);
+            saveState();
+            checkGoalCelebration(goalId);
+        }
+        window.updateGoalProgress = updateGoalProgress;
+
         function saveGoal() {
             const id = $("goal-edit-id").value;
             const name = $("goal-name").value.trim();
@@ -1048,8 +1079,8 @@
             const data = {
                 name,
                 track: $("goal-track").value,
-                weight: Number($("goal-weight").value) || 50,
-                milestone: Number($("goal-milestone").value) || 0
+                milestone: Number($("goal-milestone").value) || 0,
+                progress: Number($("goal-progress").value) || 0
             };
             if (id) {
                 const g = S.goals.find(x => x.id === id);
@@ -1068,8 +1099,9 @@
             if (!g) return;
             $("goal-name").value = g.name;
             $("goal-track").value = g.track;
-            $("goal-weight").value = g.weight;
             $("goal-milestone").value = g.milestone;
+            $("goal-progress").value = g.progress || 0;
+            $("goal-progress-val").textContent = g.progress || 0;
             $("goal-edit-id").value = g.id;
             switchTab("goals");
         }
@@ -1087,8 +1119,9 @@
         function clearGoalForm() {
             $("goal-name").value = "";
             $("goal-track").value = "AI";
-            $("goal-weight").value = 50;
             $("goal-milestone").value = 0;
+            $("goal-progress").value = 0;
+            $("goal-progress-val").textContent = "0";
             $("goal-edit-id").value = "";
         }
 
@@ -1187,19 +1220,16 @@
             return `<div class="item-card" data-testid="task-card-${t.id}">
             <div class="row between center wrap">
                 <strong>${esc(t.title)}</strong>
-                <div>${streakHtml}</div>
+                <div>${streakHtml} <span class="pill ${pillP}">${t.priority}</span> <span class="pill ${pillS}">${t.status}</span></div>
             </div>
             <div style="margin:4px 0;">
-                <span class="pill ${pillP}">${t.priority}</span>
-                <span class="pill ${pillS}">${t.status}</span>
-                <span class="pill pill-muted">${t.type === "habit" ? "习惯" : "普通"}</span>
-                <span class="pill pill-muted">${t.category} ${t.duration}</span>
                 <span class="pill pill-muted">🎯${esc(goalName)}</span>
+                <span class="pill pill-accent">${pts}分</span>
+                <span class="muted" style="font-size:12px;">${fmtDate(t.deadline)}</span>
             </div>
-            <div class="progress-bar"><div class="progress-fill" style="width:${t.progress}%"></div></div>
-            <div class="row between center wrap" style="font-size:12px;">
-                <span class="muted">进度 ${t.progress}% | base ${t.basePoints} × ${t.weight} = <strong class="text-accent">${pts}分</strong> | ${fmtDate(t.deadline)}</span>
-                <span class="muted">${isValidLabor(t)}</span>
+            <div class="row center" style="gap:8px;">
+                <input type="range" min="0" max="100" value="${t.progress}" style="flex:1;" oninput="updateTaskProgress('${t.id}',this.value)" data-testid="task-slider-${t.id}">
+                <span style="min-width:40px;text-align:right;font-weight:700;">${t.progress}%</span>
             </div>
             ${t.note ? `<div class="muted" style="font-size:12px;margin-top:2px;">📝 ${esc(t.note)}</div>` : ""}
             ${t.outputUrl ? `<div class="muted" style="font-size:12px;">🔗 <a href="${esc(t.outputUrl)}" target="_blank" rel="noopener" style="color:var(--accent2);">${esc(t.outputUrl)}</a></div>` : ""}
@@ -1234,13 +1264,13 @@
                 title,
                 goalId: $("task-goal").value,
                 priority: $("task-priority").value,
-                status: $("task-status").value,
-                type: $("task-type").value,
-                category: $("task-category").value,
-                duration: $("task-duration").value,
+                status: "未开始",
+                type: "normal",
+                category: "general",
+                duration: "30min",
                 progress: Math.min(100, Math.max(0, Number($("task-progress").value) || 0)),
                 basePoints: Number($("task-base").value) || 0,
-                weight: Number($("task-weight").value) || 1,
+                weight: 1,
                 deadline: $("task-deadline").value ? new Date($("task-deadline").value).toISOString() : null,
                 outputUrl: $("task-output").value.trim(),
                 note: $("task-note").value.trim()
@@ -1281,13 +1311,9 @@
             $("task-title").value = t.title;
             $("task-goal").value = t.goalId || "";
             $("task-priority").value = t.priority;
-            $("task-status").value = t.status;
-            $("task-type").value = t.type;
-            $("task-category").value = t.category;
-            $("task-duration").value = t.duration;
             $("task-progress").value = t.progress;
+            $("task-progress-val").textContent = t.progress;
             $("task-base").value = t.basePoints;
-            $("task-weight").value = t.weight;
             $("task-deadline").value = toLocalDT(t.deadline);
             $("task-output").value = t.outputUrl || "";
             $("task-note").value = t.note || "";
@@ -1339,17 +1365,25 @@
             toast("任务已归档");
         }
 
+        function updateTaskProgress(taskId, val) {
+            const t = S.tasks.find(x => x.id === taskId);
+            if (!t) return;
+            t.progress = Number(val);
+            if (t.progress >= 100 && t.status !== "已封包(Done)") {
+                t.status = "进行中";
+            }
+            t.updatedAt = new Date().toISOString();
+            saveState();
+        }
+        window.updateTaskProgress = updateTaskProgress;
+
         function clearTaskForm() {
             $("task-title").value = "";
             $("task-goal").value = "";
             $("task-priority").value = "P2";
-            $("task-status").value = "未开始";
-            $("task-type").value = "habit";
-            $("task-category").value = "reading";
-            $("task-duration").value = "30min";
             $("task-progress").value = 0;
+            $("task-progress-val").textContent = "0";
             $("task-base").value = 10;
-            $("task-weight").value = 1;
             $("task-deadline").value = "";
             $("task-output").value = "";
             $("task-note").value = "";
@@ -1655,6 +1689,19 @@
                 return;
             }
             await cloudRegister(email, pw);
+        });
+
+        /* 手动加分 */
+        $("manual-pts-btn").addEventListener("click", () => {
+            const reason = $("manual-pts-reason").value.trim();
+            const amount = Number($("manual-pts-amount").value) || 0;
+            if (!reason) { toast("请填写加分原因", "warn"); return; }
+            if (amount <= 0) { toast("积分需大于0", "warn"); return; }
+            S.pointsLog.push({ time: new Date().toISOString(), taskId: null, taskTitle: "手动: " + reason, points: amount, type: "earn" });
+            saveState(); renderTaskKpis(); renderReview();
+            $("manual-pts-reason").value = "";
+            $("manual-pts-amount").value = 10;
+            toast(`+${amount}分: ${reason}`);
         });
 
         /* 云端同步按钮 */
