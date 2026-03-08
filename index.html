@@ -312,12 +312,13 @@
             width: 100%;
             height: 6px;
             border-radius: 3px;
-            background: rgba(255,255,255,0.12);
+            background: rgba(255, 255, 255, 0.12);
             outline: none;
             border: none;
             padding: 0;
             margin: 6px 0;
         }
+
         input[type=range]::-webkit-slider-thumb {
             -webkit-appearance: none;
             width: 18px;
@@ -326,6 +327,7 @@
             background: linear-gradient(135deg, var(--accent), var(--accent2));
             cursor: pointer;
         }
+
         input[type=range]::-moz-range-thumb {
             width: 18px;
             height: 18px;
@@ -633,8 +635,10 @@
                             placeholder="达成奖励积分">
                     </div>
                     <div style="margin-top:8px;">
-                        <label class="muted" style="font-size:12px;">目标进度: <span id="goal-progress-val">0</span>%</label>
-                        <input id="goal-progress" data-testid="goal-input-progress" type="range" min="0" max="100" value="0" oninput="$('goal-progress-val').textContent=this.value">
+                        <label class="muted" style="font-size:12px;">目标进度: <span
+                                id="goal-progress-val">0</span>%</label>
+                        <input id="goal-progress" data-testid="goal-input-progress" type="range" min="0" max="100"
+                            value="0" oninput="$('goal-progress-val').textContent=this.value">
                     </div>
                     <div class="row wrap" style="margin-top:10px;">
                         <button id="goal-save" data-testid="goal-btn-save">保存目标</button>
@@ -677,12 +681,15 @@
                         <input id="task-deadline" data-testid="task-input-deadline" type="datetime-local">
                     </div>
                     <div style="margin-top:8px;">
-                        <label class="muted" style="font-size:12px;">执行进度: <span id="task-progress-val">0</span>%</label>
-                        <input id="task-progress" data-testid="task-input-progress" type="range" min="0" max="100" value="0" oninput="$('task-progress-val').textContent=this.value">
+                        <label class="muted" style="font-size:12px;">执行进度: <span
+                                id="task-progress-val">0</span>%</label>
+                        <input id="task-progress" data-testid="task-input-progress" type="range" min="0" max="100"
+                            value="0" oninput="$('task-progress-val').textContent=this.value">
                     </div>
                     <textarea id="task-note" data-testid="task-input-note" placeholder="备注" rows="2"
                         style="margin-top:8px;"></textarea>
-                    <input id="task-output" data-testid="task-input-output" placeholder="产出物链接(可选)" style="margin-top:6px;">
+                    <input id="task-output" data-testid="task-input-output" placeholder="产出物链接(可选)"
+                        style="margin-top:6px;">
                     <div class="row wrap" style="margin-top:10px;">
                         <button id="task-save" data-testid="task-btn-save">保存任务</button>
                         <button id="task-clear" data-testid="task-btn-clear" class="secondary">清空</button>
@@ -708,7 +715,8 @@
                     <p class="muted" style="margin-bottom:6px;">完成计划外的事也值得奖励自己</p>
                     <div class="form-grid">
                         <input id="manual-pts-reason" data-testid="manual-pts-reason" placeholder="加分原因">
-                        <input id="manual-pts-amount" data-testid="manual-pts-amount" type="number" min="1" value="10" placeholder="积分">
+                        <input id="manual-pts-amount" data-testid="manual-pts-amount" type="number" min="1" value="10"
+                            placeholder="积分">
                     </div>
                     <button id="manual-pts-btn" data-testid="manual-pts-btn" style="margin-top:8px;">➕ 加分</button>
                 </div>
@@ -1049,7 +1057,7 @@
                     <span class="pill pill-muted">${taskCount}个任务</span>
                 </div>
                 <div class="row center" style="gap:8px;">
-                    <input type="range" min="0" max="100" value="${prog}" style="flex:1;" oninput="updateGoalProgress('${g.id}',this.value)" data-testid="goal-slider-${g.id}">
+                    <input type="range" min="0" max="100" value="${prog}" style="flex:1;" oninput="this.nextElementSibling.textContent=this.value+'%';updateGoalProgress('${g.id}',this.value)" data-testid="goal-slider-${g.id}">
                     <span style="min-width:40px;text-align:right;font-weight:700;">${prog}%</span>
                 </div>
                 <div class="row between center" style="margin-top:6px;">
@@ -1228,7 +1236,7 @@
                 <span class="muted" style="font-size:12px;">${fmtDate(t.deadline)}</span>
             </div>
             <div class="row center" style="gap:8px;">
-                <input type="range" min="0" max="100" value="${t.progress}" style="flex:1;" oninput="updateTaskProgress('${t.id}',this.value)" data-testid="task-slider-${t.id}">
+                <input type="range" min="0" max="100" value="${t.progress}" style="flex:1;" oninput="this.nextElementSibling.textContent=this.value+'%';updateTaskProgress('${t.id}',this.value)" data-testid="task-slider-${t.id}">
                 <span style="min-width:40px;text-align:right;font-weight:700;">${t.progress}%</span>
             </div>
             ${t.note ? `<div class="muted" style="font-size:12px;margin-top:2px;">📝 ${esc(t.note)}</div>` : ""}
@@ -1412,9 +1420,13 @@
                 </div>
                 <div class="muted" style="margin:4px 0;">成本 <strong class="text-accent">${r.cost}分</strong> | 剩余 ${remaining} | 已兑 ${r.redeemedCount}</div>
                 ${r.note ? `<div class="muted" style="font-size:12px;">📝 ${esc(r.note)}</div>` : ""}
-                <button data-testid="shop-btn-redeem-${r.id}" onclick="redeemReward('${r.id}')" ${canRedeem ? "" : "disabled"} style="margin-top:6px;font-size:12px;padding:5px 14px;">
-                    ${canRedeem ? "🎉 兑换" : (balance < r.cost ? `还差 ${r.cost - balance} 分` : "库存不足")}
-                </button>
+                <div class="row wrap" style="margin-top:6px;gap:4px;">
+                    <button data-testid="shop-btn-redeem-${r.id}" onclick="redeemReward('${r.id}')" ${canRedeem ? "" : "disabled"} style="font-size:12px;padding:5px 14px;">
+                        ${canRedeem ? "🎉 兑换" : (balance < r.cost ? `还差 ${r.cost - balance} 分` : "库存不足")}
+                    </button>
+                    <button data-testid="shop-btn-edit-${r.id}" onclick="editReward('${r.id}')" class="secondary" style="padding:4px 10px;font-size:12px;">编辑</button>
+                    <button data-testid="shop-btn-del-${r.id}" onclick="deleteReward('${r.id}')" class="danger" style="padding:4px 10px;font-size:12px;">删除</button>
+                </div>
             </div>`;
             }).join("");
         }
@@ -1440,7 +1452,58 @@
             saveState(); renderRewards(); renderRedemptionLog(); renderTaskKpis();
             toast(`🎁 成功兑换「${r.name}」！`);
         }
+        function saveReward() {
+            const id = $("reward-edit-id").value;
+            const name = $("reward-name").value.trim();
+            if (!name) { toast("奖励名称不能为空", "warn"); return; }
+            const data = {
+                name,
+                cost: Number($("reward-cost").value) || 30,
+                stock: Number($("reward-stock").value) || 99,
+                type: $("reward-type").value,
+                note: $("reward-note").value.trim()
+            };
+            if (id) {
+                const r = S.rewards.find(x => x.id === id);
+                if (r) Object.assign(r, data);
+                toast("奖励已更新");
+            } else {
+                S.rewards.push({ id: uid(), ...data, redeemedCount: 0 });
+                toast("奖励已添加");
+            }
+            clearRewardForm();
+            saveState(); renderRewards();
+        }
+        function editReward(id) {
+            const r = S.rewards.find(x => x.id === id);
+            if (!r) return;
+            $("reward-name").value = r.name;
+            $("reward-cost").value = r.cost;
+            $("reward-stock").value = r.stock;
+            $("reward-type").value = r.type || "即时奖励";
+            $("reward-note").value = r.note || "";
+            $("reward-edit-id").value = r.id;
+            switchTab("shop");
+        }
+        async function deleteReward(id) {
+            const ok = await showModal("删除奖励", "确定删除该奖励项？");
+            if (!ok) return;
+            S.rewards = S.rewards.filter(x => x.id !== id);
+            clearRewardForm();
+            saveState(); renderRewards();
+            toast("奖励已删除");
+        }
+        function clearRewardForm() {
+            $("reward-name").value = "";
+            $("reward-cost").value = 30;
+            $("reward-stock").value = 99;
+            $("reward-type").value = "即时奖励";
+            $("reward-note").value = "";
+            $("reward-edit-id").value = "";
+        }
         window.redeemReward = redeemReward;
+        window.editReward = editReward;
+        window.deleteReward = deleteReward;
 
         /* ===================================================
            Step 6: 复盘 + 进度环 + 流水 + 周报 + 导入导出
@@ -1691,18 +1754,9 @@
             await cloudRegister(email, pw);
         });
 
-        /* 手动加分 */
-        $("manual-pts-btn").addEventListener("click", () => {
-            const reason = $("manual-pts-reason").value.trim();
-            const amount = Number($("manual-pts-amount").value) || 0;
-            if (!reason) { toast("请填写加分原因", "warn"); return; }
-            if (amount <= 0) { toast("积分需大于0", "warn"); return; }
-            S.pointsLog.push({ time: new Date().toISOString(), taskId: null, taskTitle: "手动: " + reason, points: amount, type: "earn" });
-            saveState(); renderTaskKpis(); renderReview();
-            $("manual-pts-reason").value = "";
-            $("manual-pts-amount").value = 10;
-            toast(`+${amount}分: ${reason}`);
-        });
+        /* 奖励 CRUD */
+        $("reward-save").addEventListener("click", saveReward);
+        $("reward-clear").addEventListener("click", clearRewardForm);
 
         /* 云端同步按钮 */
         $("btnCloudSync").addEventListener("click", manualCloudSync);
