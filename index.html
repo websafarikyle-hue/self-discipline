@@ -1,0 +1,1705 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>自律任务系统</title>
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <style>
+        :root {
+            --bg1: #0f0c29;
+            --bg2: #302b63;
+            --bg3: #24243e;
+            --glass: rgba(255, 255, 255, 0.06);
+            --glass-border: rgba(255, 255, 255, 0.12);
+            --glass-hover: rgba(255, 255, 255, 0.10);
+            --text: #e8e6f0;
+            --text-muted: #9a96b0;
+            --accent: #7c5cfc;
+            --accent2: #00d4aa;
+            --accent3: #ff6b9d;
+            --warn: #f59e0b;
+            --ok: #22c55e;
+            --danger: #ef4444;
+            --radius: 14px;
+            --radius-sm: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+            color: var(--text);
+            background: linear-gradient(135deg, var(--bg1), var(--bg2), var(--bg3));
+            min-height: 100vh;
+            line-height: 1.5;
+        }
+
+        .app {
+            max-width: 860px;
+            margin: 0 auto;
+            padding: 12px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Glass Card */
+        .card {
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius);
+            padding: 16px;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            margin-bottom: 12px;
+        }
+
+        h1 {
+            font-size: 22px;
+            margin-bottom: 4px;
+        }
+
+        h2 {
+            font-size: 17px;
+            margin-bottom: 8px;
+            color: var(--accent2);
+        }
+
+        h3 {
+            font-size: 15px;
+            margin-bottom: 6px;
+        }
+
+        .row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .wrap {
+            flex-wrap: wrap;
+        }
+
+        .between {
+            justify-content: space-between;
+        }
+
+        .center {
+            align-items: center;
+        }
+
+        .grow {
+            flex: 1;
+        }
+
+        .muted {
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        /* Form Controls */
+        input,
+        select,
+        textarea {
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--glass-border);
+            padding: 9px 12px;
+            font-size: 14px;
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text);
+            outline: none;
+            width: 100%;
+            transition: border-color .2s;
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+            border-color: var(--accent);
+        }
+
+        select option {
+            background: #1a1a2e;
+            color: #fff;
+        }
+
+        /* Buttons */
+        button {
+            cursor: pointer;
+            border-radius: var(--radius-sm);
+            border: none;
+            padding: 9px 18px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #fff;
+            background: linear-gradient(135deg, var(--accent), #6341e0);
+            transition: opacity .2s, transform .1s;
+            white-space: nowrap;
+        }
+
+        button:hover {
+            opacity: .88;
+        }
+
+        button:active {
+            transform: scale(.97);
+        }
+
+        button:disabled {
+            opacity: .4;
+            cursor: not-allowed;
+        }
+
+        button.secondary {
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            color: var(--text);
+        }
+
+        button.warn {
+            background: var(--warn);
+        }
+
+        button.danger {
+            background: var(--danger);
+        }
+
+        button.ok-btn {
+            background: var(--ok);
+        }
+
+        /* Tabs */
+        .tabs {
+            position: sticky;
+            top: 0;
+            z-index: 9;
+            background: rgba(15, 12, 41, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--glass-border);
+            margin: -12px -12px 14px;
+            padding: 10px 12px;
+        }
+
+        .tabs button {
+            padding: 8px 14px;
+            font-size: 13px;
+        }
+
+        .tabs button.active {
+            background: linear-gradient(135deg, var(--accent), #6341e0);
+        }
+
+        .tabs button.secondary {
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+        }
+
+        /* Form Grid */
+        .form-grid {
+            display: grid;
+            gap: 8px;
+            grid-template-columns: 1fr;
+        }
+
+        @media (min-width: 600px) {
+            .form-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .form-grid-3 {
+                grid-template-columns: 1fr 1fr 1fr;
+            }
+        }
+
+        /* Items */
+        .item-card {
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-sm);
+            padding: 10px 12px;
+            background: rgba(255, 255, 255, 0.04);
+            margin-bottom: 8px;
+            transition: background .2s;
+        }
+
+        .item-card:hover {
+            background: var(--glass-hover);
+        }
+
+        /* Pills */
+        .pill {
+            display: inline-block;
+            border-radius: 999px;
+            padding: 2px 10px;
+            font-size: 11px;
+            font-weight: 600;
+            margin: 2px 4px 2px 0;
+        }
+
+        .pill-accent {
+            background: rgba(124, 92, 252, 0.25);
+            color: #b4a0ff;
+        }
+
+        .pill-ok {
+            background: rgba(34, 197, 94, 0.2);
+            color: #6ee7a0;
+        }
+
+        .pill-warn {
+            background: rgba(245, 158, 11, 0.2);
+            color: #fbbf24;
+        }
+
+        .pill-danger {
+            background: rgba(239, 68, 68, 0.2);
+            color: #fca5a5;
+        }
+
+        .pill-muted {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-muted);
+        }
+
+        /* KPI */
+        .kpi {
+            text-align: center;
+            padding: 12px 10px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--glass-border);
+            background: var(--glass);
+            min-width: 110px;
+            flex: 1;
+        }
+
+        .kpi strong {
+            font-size: 22px;
+            display: block;
+            margin-top: 4px;
+        }
+
+        .kpi-label {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        /* Progress bar */
+        .progress-bar {
+            height: 8px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+            margin: 6px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            background: linear-gradient(90deg, var(--accent), var(--accent2));
+            transition: width .4s ease;
+        }
+
+        /* Progress Ring (SVG) */
+        .ring-wrap {
+            position: relative;
+            width: 100px;
+            height: 100px;
+            margin: 0 auto 8px;
+        }
+
+        .ring-wrap svg {
+            transform: rotate(-90deg);
+        }
+
+        .ring-label {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        /* Toast */
+        #toastBox {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            z-index: 999;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .toast {
+            padding: 10px 18px;
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            font-weight: 600;
+            color: #fff;
+            animation: slideIn .3s ease;
+        }
+
+        .toast-ok {
+            background: var(--ok);
+        }
+
+        .toast-warn {
+            background: var(--warn);
+        }
+
+        .toast-danger {
+            background: var(--danger);
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(40px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 99;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn .2s;
+        }
+
+        .modal-box {
+            background: #1a1a2e;
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius);
+            padding: 24px;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+        }
+
+        .modal-box h2 {
+            margin-bottom: 12px;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        /* Celebrate */
+        .celebrate {
+            animation: pop .5s ease;
+        }
+
+        @keyframes pop {
+            0% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.08);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        /* Quick add */
+        .quick-add {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .quick-add input,
+        .quick-add select {
+            flex: 1;
+        }
+
+        /* Streak badge */
+        .streak-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: linear-gradient(135deg, #ff6b9d, #fbbf24);
+            color: #fff;
+            font-size: 12px;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 999px;
+        }
+
+        /* Scrollable section */
+        .scroll-section {
+            max-height: 60vh;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        /* Section group header */
+        .group-header {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--accent2);
+            margin: 14px 0 6px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        /* Sub-tab */
+        .sub-tabs {
+            margin-bottom: 10px;
+        }
+
+        .sub-tabs button {
+            padding: 5px 12px;
+            font-size: 12px;
+            border-radius: 999px;
+        }
+
+        .text-ok {
+            color: var(--ok);
+        }
+
+        .text-danger {
+            color: var(--danger);
+        }
+
+        .text-accent {
+            color: var(--accent);
+        }
+
+        .text-accent2 {
+            color: var(--accent2);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app" data-testid="app-root">
+
+        <!-- ===== Toast 容器 ===== -->
+        <div id="toastBox"></div>
+
+        <!-- ===== 登录页 ===== -->
+        <section id="loginPanel" class="card" style="max-width:400px;margin:40px auto;">
+            <h1 style="text-align:center;">🎯 自律系统</h1>
+
+            <!-- Supabase 配置（首次需要填写） -->
+            <div class="card" style="margin:12px 0;padding:10px;">
+                <div class="row between center" style="cursor:pointer;"
+                    onclick="$('supaConfig').classList.toggle('hidden')">
+                    <span class="muted" style="font-size:13px;">☁️ 云端同步配置（点击展开）</span>
+                    <span class="muted" style="font-size:11px;">▼</span>
+                </div>
+                <div id="supaConfig" class="hidden" style="margin-top:8px;">
+                    <p class="muted" style="font-size:11px;margin-bottom:6px;">填入你的 Supabase 项目信息即可启用云端数据同步。<br>前往 <a
+                            href="https://supabase.com" target="_blank" rel="noopener"
+                            style="color:var(--accent2);">supabase.com</a> 免费注册。</p>
+                    <div class="form-grid" style="grid-template-columns:1fr;gap:6px;">
+                        <input id="supa-url" data-testid="supa-input-url" placeholder="Supabase Project URL"
+                            style="font-size:12px;">
+                        <input id="supa-key" data-testid="supa-input-key" placeholder="Supabase Anon Key"
+                            style="font-size:12px;">
+                        <button id="supa-save-config" data-testid="supa-btn-save-config" class="secondary"
+                            style="font-size:12px;">保存配置</button>
+                    </div>
+                    <p id="supaConfigMsg" class="muted" style="font-size:11px;margin-top:4px;"></p>
+                </div>
+            </div>
+
+            <!-- 离线模式（本地账号） -->
+            <div class="card" style="padding:10px;margin-bottom:8px;">
+                <p class="muted" style="font-size:12px;margin-bottom:6px;">📌 <strong>离线模式</strong>（数据存本地浏览器）</p>
+                <div class="form-grid" style="grid-template-columns:1fr;">
+                    <input id="login-email" data-testid="login-input-username" placeholder="用户名" value="admin">
+                    <input id="login-password" data-testid="login-input-password" placeholder="密码" type="password"
+                        value="123456">
+                    <label class="row center" style="font-size:13px;"><input id="login-remember"
+                            data-testid="login-checkbox-remember" type="checkbox" checked
+                            style="width:auto;margin-right:6px;"> 记住登录 30 天</label>
+                    <button id="login-btn" data-testid="login-btn-submit" style="width:100%;">离线登录</button>
+                </div>
+            </div>
+
+            <!-- 云端模式（Supabase 账号） -->
+            <div class="card" style="padding:10px;">
+                <p class="muted" style="font-size:12px;margin-bottom:6px;">☁️ <strong>云端模式</strong>（数据跟账号走，多设备同步）</p>
+                <div class="form-grid" style="grid-template-columns:1fr;">
+                    <input id="cloud-email" data-testid="cloud-input-email" placeholder="邮箱" type="email">
+                    <input id="cloud-password" data-testid="cloud-input-password" placeholder="密码（至少6位）"
+                        type="password">
+                    <div class="row" style="gap:6px;">
+                        <button id="cloud-login-btn" data-testid="cloud-btn-login" style="flex:1;">云端登录</button>
+                        <button id="cloud-register-btn" data-testid="cloud-btn-register" class="secondary"
+                            style="flex:1;">注册新号</button>
+                    </div>
+                </div>
+            </div>
+
+            <p id="loginMsg" data-testid="login-message" class="muted" style="text-align:center;margin-top:8px;"></p>
+        </section>
+
+        <!-- ===== 主面板 ===== -->
+        <section id="mainPanel" class="hidden">
+
+            <!-- 顶部 Tabs -->
+            <div class="tabs row wrap center between">
+                <div class="row wrap" style="gap:6px;">
+                    <button id="tabGoals" data-testid="nav-tab-goals" class="active">🎯 战略目标</button>
+                    <button id="tabTasks" data-testid="nav-tab-tasks" class="secondary">✅ 任务清单</button>
+                    <button id="tabShop" data-testid="nav-tab-shop" class="secondary">💎 补给站</button>
+                    <button id="tabReview" data-testid="nav-tab-review" class="secondary">📊 复盘</button>
+                </div>
+                <div class="row wrap" style="gap:6px;">
+                    <button id="btnCloudSync" data-testid="system-btn-cloud-sync" class="secondary"
+                        style="font-size:12px;">☁️ 同步</button>
+                    <button id="btnExport" data-testid="system-btn-export" class="secondary"
+                        style="font-size:12px;">导出</button>
+                    <button id="btnImport" data-testid="system-btn-import" class="secondary"
+                        style="font-size:12px;">导入</button>
+                    <input id="jsonFile" data-testid="system-input-import-file" type="file" accept="application/json"
+                        class="hidden">
+                    <button id="btnLogout" data-testid="system-btn-logout" class="danger"
+                        style="font-size:12px;">退出</button>
+                </div>
+            </div>
+
+            <!-- ===== Tab1: 战略目标 ===== -->
+            <section id="pageGoals" data-testid="page-goals">
+                <div class="card">
+                    <h2>🎯 新增 / 编辑战略目标</h2>
+                    <div class="form-grid">
+                        <input id="goal-name" data-testid="goal-input-name" placeholder="目标名称">
+                        <select id="goal-track" data-testid="goal-select-track">
+                            <option value="AI">AI</option>
+                            <option value="Web3">Web3</option>
+                            <option value="量化金融">量化金融</option>
+                            <option value="学术学位">学术学位</option>
+                        </select>
+                        <input id="goal-weight" data-testid="goal-input-weight" type="number" min="0" max="100"
+                            value="50" placeholder="总权重 0-100">
+                        <input id="goal-milestone" data-testid="goal-input-milestone" type="number" min="0" value="0"
+                            placeholder="阶段性大奖积分">
+                    </div>
+                    <div class="row wrap" style="margin-top:10px;">
+                        <button id="goal-save" data-testid="goal-btn-save">保存目标</button>
+                        <button id="goal-clear" data-testid="goal-btn-clear" class="secondary">清空</button>
+                        <input id="goal-edit-id" type="hidden" value="">
+                    </div>
+                </div>
+                <div class="card">
+                    <h2>目标列表</h2>
+                    <div id="goalList" data-testid="goal-list" class="scroll-section"></div>
+                </div>
+            </section>
+
+            <!-- ===== Tab2: 任务清单 ===== -->
+            <section id="pageTasks" data-testid="page-tasks" class="hidden">
+                <!-- 快速添加 -->
+                <div class="card">
+                    <h2>⚡ 快速添加</h2>
+                    <div class="quick-add">
+                        <input id="quick-title" data-testid="quick-input-title" placeholder="任务名称">
+                        <select id="quick-goal" data-testid="quick-select-goal"></select>
+                        <input id="quick-deadline" data-testid="quick-input-deadline" type="date">
+                        <button id="quick-add-btn" data-testid="quick-btn-add">添加</button>
+                    </div>
+                </div>
+                <!-- 完整表单 -->
+                <div class="card">
+                    <h2>✅ 新增 / 编辑任务</h2>
+                    <div class="form-grid form-grid-3">
+                        <input id="task-title" data-testid="task-input-title" placeholder="任务名称">
+                        <select id="task-goal" data-testid="task-select-goal"></select>
+                        <select id="task-priority" data-testid="task-select-priority">
+                            <option value="P0">P0 - 紧急</option>
+                            <option value="P1">P1 - 重要</option>
+                            <option value="P2" selected>P2 - 一般</option>
+                            <option value="P3">P3 - 低</option>
+                        </select>
+                        <select id="task-status" data-testid="task-select-status">
+                            <option value="未开始">未开始</option>
+                            <option value="进行中">进行中</option>
+                            <option value="已封包(Done)">已封包(Done)</option>
+                            <option value="已挂起">已挂起</option>
+                        </select>
+                        <select id="task-type" data-testid="task-select-type">
+                            <option value="habit">习惯</option>
+                            <option value="normal">普通</option>
+                        </select>
+                        <select id="task-category" data-testid="task-select-category">
+                            <option value="reading">阅读</option>
+                            <option value="exercise">锻炼</option>
+                            <option value="general">通用</option>
+                        </select>
+                        <select id="task-duration" data-testid="task-select-duration">
+                            <option value="30min">30min</option>
+                            <option value="1h">1h</option>
+                        </select>
+                        <input id="task-progress" data-testid="task-input-progress" type="number" min="0" max="100"
+                            value="0" placeholder="完成进度 0-100">
+                        <input id="task-base" data-testid="task-input-base" type="number" min="0" value="10"
+                            placeholder="基础分值">
+                        <input id="task-weight" data-testid="task-input-weight" type="number" min="0.1" step="0.1"
+                            value="1.0" placeholder="权重系数">
+                        <input id="task-deadline" data-testid="task-input-deadline" type="datetime-local">
+                        <input id="task-output" data-testid="task-input-output" placeholder="产出物链接(URL)">
+                    </div>
+                    <textarea id="task-note" data-testid="task-input-note" placeholder="备注（执行思路/卡点/心得）" rows="2"
+                        style="margin-top:8px;"></textarea>
+                    <div class="row wrap" style="margin-top:10px;">
+                        <button id="task-save" data-testid="task-btn-save">保存任务</button>
+                        <button id="task-clear" data-testid="task-btn-clear" class="secondary">清空</button>
+                        <input id="task-edit-id" type="hidden" value="">
+                    </div>
+                </div>
+                <!-- 子视图切换 -->
+                <div class="sub-tabs row wrap">
+                    <button id="subAll" data-testid="task-subtab-all" class="active">全景看板</button>
+                    <button id="subP01" data-testid="task-subtab-p01" class="secondary">核心攻坚(P0/P1)</button>
+                    <button id="subByGoal" data-testid="task-subtab-bygoal" class="secondary">按目标分组</button>
+                </div>
+                <!-- KPI -->
+                <div class="row wrap" id="taskKpis" data-testid="task-kpi-wrap" style="margin-bottom:12px;"></div>
+                <!-- 任务列表 -->
+                <div id="taskListContainer" data-testid="task-list-container" class="scroll-section"></div>
+            </section>
+
+            <!-- ===== Tab3: 补给站 ===== -->
+            <section id="pageShop" data-testid="page-shop" class="hidden">
+                <div class="card">
+                    <h2>💎 补给站 & 勋章墙</h2>
+                    <p class="muted">余额积分 ≥ 成本 且 库存 > 0 才可兑换</p>
+                    <div id="rewardList" data-testid="shop-reward-list"></div>
+                </div>
+                <div class="card">
+                    <h2>兑换记录</h2>
+                    <div id="redemptionLog" data-testid="shop-redemption-log" class="scroll-section"></div>
+                </div>
+            </section>
+
+            <!-- ===== Tab4: 复盘 ===== -->
+            <section id="pageReview" data-testid="page-review" class="hidden">
+                <div class="card" style="text-align:center;">
+                    <h2>📊 今日进度</h2>
+                    <div class="ring-wrap" id="progressRing" data-testid="review-progress-ring"></div>
+                </div>
+                <div class="row wrap" id="reviewKpis" data-testid="review-kpi-wrap" style="margin-bottom:12px;"></div>
+                <div class="card">
+                    <h2>积分流水</h2>
+                    <div id="pointsLog" data-testid="review-points-log" class="scroll-section"
+                        style="max-height:200px;"></div>
+                </div>
+                <div class="card">
+                    <h2>可兑换项</h2>
+                    <div id="redeemable" data-testid="review-redeemable-list"></div>
+                </div>
+                <div class="card">
+                    <div class="row wrap between center" style="margin-bottom:8px;">
+                        <h2 style="margin:0;">复盘报告</h2>
+                        <div class="row" style="gap:6px;">
+                            <button id="genDailyReport" data-testid="review-btn-daily" class="secondary"
+                                style="font-size:12px;">今日报告</button>
+                            <button id="genWeeklyReport" data-testid="review-btn-weekly" class="secondary"
+                                style="font-size:12px;">本周报告</button>
+                        </div>
+                    </div>
+                    <textarea id="reviewOutput" data-testid="review-output" rows="10" style="width:100%;"></textarea>
+                    <button id="copyReport" data-testid="review-btn-copy" class="secondary"
+                        style="margin-top:8px;font-size:12px;">复制报告</button>
+                </div>
+                <div class="card">
+                    <h2>JSON 数据（可复制，Openclawe 可读取）</h2>
+                    <textarea id="jsonOutput" data-testid="review-json-output" rows="6"
+                        style="width:100%;font-size:12px;"></textarea>
+                </div>
+            </section>
+
+        </section>
+
+        <p class="muted" style="text-align:center;margin-top:16px;font-size:11px;">所有关键控件均提供稳定 data-testid，便于 Openclawe
+            自动化定位。</p>
+    </div>
+
+    <script>
+        /* ===================================================
+           Supabase 云端同步层
+           =================================================== */
+        const SUPA_CONFIG_KEY = "sdv2_supa_config";
+        let supaClient = null;
+        let cloudMode = false; // true = data syncs to Supabase
+        let cloudUserId = null;
+
+        function loadSupaConfig() {
+            try { return JSON.parse(localStorage.getItem(SUPA_CONFIG_KEY)) || null; } catch (_) { return null; }
+        }
+        function saveSupaConfig(url, key) {
+            localStorage.setItem(SUPA_CONFIG_KEY, JSON.stringify({ url, key }));
+        }
+
+        function initSupaClient() {
+            const cfg = loadSupaConfig();
+            if (!cfg || !cfg.url || !cfg.key) return false;
+            try {
+                supaClient = window.supabase.createClient(cfg.url, cfg.key);
+                return true;
+            } catch (e) { console.error("Supabase init failed", e); return false; }
+        }
+
+        /* 云端注册 */
+        async function cloudRegister(email, password) {
+            if (!supaClient) { toast("请先配置 Supabase", "warn"); return false; }
+            const { data, error } = await supaClient.auth.signUp({ email, password });
+            if (error) { toast("注册失败: " + error.message, "danger"); return false; }
+            toast("注册成功！请检查邮箱确认（部分项目可直接登录）");
+            return true;
+        }
+
+        /* 云端登录 */
+        async function cloudLogin(email, password) {
+            if (!supaClient) { toast("请先配置 Supabase", "warn"); return false; }
+            const { data, error } = await supaClient.auth.signInWithPassword({ email, password });
+            if (error) { toast("登录失败: " + error.message, "danger"); return false; }
+            cloudMode = true;
+            cloudUserId = data.user.id;
+            /* 从云端拉取数据 */
+            await cloudPull();
+            return true;
+        }
+
+        /* 推送数据到云端 */
+        async function cloudPush() {
+            if (!cloudMode || !supaClient || !cloudUserId) return;
+            const payload = { user_id: cloudUserId, data: JSON.stringify(S), updated_at: new Date().toISOString() };
+            const { error } = await supaClient.from("user_data").upsert(payload, { onConflict: "user_id" });
+            if (error) { console.error("Cloud push error:", error); toast("云端同步失败", "danger"); }
+        }
+
+        /* 从云端拉取数据 */
+        async function cloudPull() {
+            if (!supaClient || !cloudUserId) return;
+            const { data, error } = await supaClient.from("user_data").select("data").eq("user_id", cloudUserId).single();
+            if (error) {
+                if (error.code === "PGRST116") {
+                    /* 云端无数据，推送当前本地数据 */
+                    await cloudPush();
+                    return;
+                }
+                console.error("Cloud pull error:", error);
+                return;
+            }
+            if (data && data.data) {
+                try {
+                    const cloudData = JSON.parse(data.data);
+                    if (cloudData.goals && cloudData.tasks && cloudData.rewards) {
+                        S = cloudData;
+                        if (!S.pointsLog) S.pointsLog = [];
+                        if (!S.redemptions) S.redemptions = [];
+                        saveState();
+                        toast("☁️ 已从云端同步数据");
+                    }
+                } catch (e) { console.error("Parse cloud data error:", e); }
+            }
+        }
+
+        /* 手动同步按钮 */
+        async function manualCloudSync() {
+            if (!cloudMode) { toast("未启用云端模式，请用云端账号登录", "warn"); return; }
+            toast("正在同步...");
+            await cloudPush();
+            toast("☁️ 数据已同步到云端");
+        }
+
+        /* 覆写 saveState，在云端模式下自动推送 */
+        const _origSaveStateKey = "sdv2_data";
+
+        /* ===================================================
+           Step 2: 数据模型 + 持久化 + 工具函数
+           =================================================== */
+        const STORAGE_KEY = "sdv2_data";
+        const SESSION_KEY = "sdv2_session";
+        const AUTH = { username: "admin", password: "123456" };
+
+        /* --- 默认奖励 --- */
+        const DEFAULT_REWARDS = [
+            { id: "r1", name: "奶茶", cost: 30, stock: 99, redeemedCount: 0, type: "即时奖励", note: "" },
+            { id: "r2", name: "夜宵", cost: 60, stock: 99, redeemedCount: 0, type: "即时奖励", note: "" },
+            { id: "r3", name: "50餐", cost: 120, stock: 50, redeemedCount: 0, type: "长线奖励", note: "" },
+            { id: "r4", name: "100餐", cost: 220, stock: 30, redeemedCount: 0, type: "长线奖励", note: "" },
+            { id: "r5", name: "200餐", cost: 420, stock: 20, redeemedCount: 0, type: "里程碑奖励", note: "" }
+        ];
+
+        /* --- 默认目标 --- */
+        const DEFAULT_GOALS = [
+            { id: "g1", name: "AI 技术精进", track: "AI", weight: 80, milestone: 200 },
+            { id: "g2", name: "Web3 探索", track: "Web3", weight: 60, milestone: 150 },
+            { id: "g3", name: "量化策略研发", track: "量化金融", weight: 70, milestone: 180 },
+            { id: "g4", name: "学位论文推进", track: "学术学位", weight: 90, milestone: 250 }
+        ];
+
+        /* --- 默认任务模板 --- */
+        function seedTasks(goals) {
+            const now = new Date();
+            const tpl = [
+                ["AI论文精读30min", "g1", "P1", "habit", "reading", "30min", 8, 1],
+                ["晨跑30分钟", "g4", "P0", "habit", "exercise", "30min", 10, 1],
+                ["晚间深度阅读1h", "g1", "P1", "habit", "reading", "1h", 15, 1],
+                ["力量训练1h", "g4", "P2", "habit", "exercise", "1h", 20, 1],
+                ["Web3项目推进90min", "g2", "P0", "normal", "general", "1h", 16, 1.2],
+                ["量化策略回测", "g3", "P1", "normal", "general", "1h", 18, 1.5],
+                ["英语论文写作", "g4", "P2", "normal", "general", "30min", 10, 1],
+                ["睡前复盘总结", "g1", "P3", "habit", "general", "30min", 10, 1]
+            ];
+            return tpl.map((t, i) => {
+                const d = new Date(now); d.setDate(now.getDate() + (i % 5)); d.setHours(20, 30, 0, 0);
+                return {
+                    id: uid(), title: t[0], goalId: t[1], priority: t[2],
+                    status: "未开始", type: t[3], category: t[4], duration: t[5],
+                    basePoints: t[6], weight: t[7], progress: 0,
+                    outputUrl: "", note: "", deadline: d.toISOString(),
+                    streak: 0, lastDoneDate: null,
+                    createdAt: now.toISOString(), updatedAt: now.toISOString()
+                };
+            });
+        }
+
+        function seedState() {
+            return {
+                goals: structuredClone(DEFAULT_GOALS),
+                tasks: seedTasks(DEFAULT_GOALS),
+                rewards: structuredClone(DEFAULT_REWARDS),
+                redemptions: [],
+                pointsLog: []
+            };
+        }
+
+        /* --- UID --- */
+        function uid() { return crypto.randomUUID().slice(0, 8); }
+
+        /* --- 持久化 --- */
+        function loadState() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (raw) {
+                    const p = JSON.parse(raw);
+                    if (p.goals && p.tasks && p.rewards && p.redemptions) return p;
+                }
+            } catch (_) { }
+            return seedState();
+        }
+        function saveState() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(S));
+            /* 云端模式下自动推送（防抖2秒） */
+            if (cloudMode) {
+                clearTimeout(saveState._timer);
+                saveState._timer = setTimeout(() => cloudPush(), 2000);
+            }
+        }
+        saveState._timer = null;
+
+        let S = loadState();
+
+        /* --- 工具函数 --- */
+        function esc(s) {
+            const d = document.createElement("div"); d.textContent = s; return d.innerHTML;
+        }
+        function $(id) { return document.getElementById(id); }
+        function pad2(n) { return String(n).padStart(2, "0"); }
+        function toLocalDT(iso) {
+            if (!iso) return "";
+            const d = new Date(iso);
+            return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+        }
+        function fmtDate(iso) {
+            if (!iso) return "未设置";
+            return new Date(iso).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+        }
+        function todayStr() { return new Date().toISOString().slice(0, 10); }
+
+        /* --- Toast（替代 alert/confirm） --- */
+        function toast(msg, type = "ok") {
+            const box = $("toastBox");
+            const el = document.createElement("div");
+            el.className = `toast toast-${type}`;
+            el.textContent = msg;
+            box.appendChild(el);
+            setTimeout(() => el.remove(), 2600);
+        }
+
+        /* --- Modal（替代 confirm） --- */
+        let _modalResolve = null;
+        function showModal(title, msg) {
+            return new Promise(resolve => {
+                _modalResolve = resolve;
+                const overlay = document.createElement("div");
+                overlay.className = "modal-overlay";
+                overlay.id = "modalOverlay";
+                overlay.innerHTML = `<div class="modal-box"><h2>${esc(title)}</h2><p style="margin-bottom:16px;">${esc(msg)}</p><div class="row center" style="justify-content:center;gap:10px;"><button data-testid="modal-btn-confirm" onclick="closeModal(true)">确认</button><button class="secondary" data-testid="modal-btn-cancel" onclick="closeModal(false)">取消</button></div></div>`;
+                document.body.appendChild(overlay);
+            });
+        }
+        function closeModal(v) {
+            const o = $("modalOverlay"); if (o) o.remove();
+            if (_modalResolve) { _modalResolve(v); _modalResolve = null; }
+        }
+        window.closeModal = closeModal;
+
+        /* --- 业务计算 --- */
+        function calcActualPoints(t) {
+            if (t.status !== "已封包(Done)") return 0;
+            return Math.max(0, Math.round(Number(t.basePoints || 0) * Number(t.weight || 1)));
+        }
+        function getTimeWindow(deadline) {
+            if (!deadline) return "06_未设截止";
+            const diff = Math.floor((new Date(deadline).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / 86400000);
+            if (diff < 0) return "05_已逾期";
+            if (diff === 0) return "01_今天";
+            if (diff === 1) return "02_明天";
+            if (diff <= 7) return "03_本周";
+            return "04_后续";
+        }
+        function getTimeWindowLabel(tw) {
+            const m = { "01_今天": "🔴 今天", "02_明天": "🟡 明天", "03_本周": "🔵 本周", "04_后续": "⚪ 后续", "05_已逾期": "⛔ 已逾期", "06_未设截止": "📌 未设截止" };
+            return m[tw] || tw;
+        }
+        function goalProgress(goalId) {
+            const tasks = S.tasks.filter(t => t.goalId === goalId);
+            if (!tasks.length) return 0;
+            return Math.round(tasks.reduce((s, t) => s + Number(t.progress || 0), 0) / tasks.length);
+        }
+        function goalStatus(goalId) { return goalProgress(goalId) >= 100 ? "已达成" : "推进中"; }
+        function totals() {
+            const earned = S.tasks.reduce((s, t) => s + calcActualPoints(t), 0);
+            const spent = S.redemptions.reduce((s, r) => s + r.cost, 0);
+            return { earned, spent, balance: earned - spent };
+        }
+        function isValidLabor(t) { return t.goalId ? "有效" : "无效"; }
+
+        /* ===== Step 2 完成，下面 Step 3~7 继续 ===== */
+
+        /* ===================================================
+           Step 3: 战略目标 CRUD + 渲染
+           =================================================== */
+        function renderGoals() {
+            const list = $("goalList");
+            if (!S.goals.length) { list.innerHTML = '<p class="muted">暂无目标，请先添加</p>'; return; }
+            list.innerHTML = S.goals.map(g => {
+                const prog = goalProgress(g.id);
+                const st = goalStatus(g.id);
+                const taskCount = S.tasks.filter(t => t.goalId === g.id).length;
+                return `<div class="item-card" data-testid="goal-card-${g.id}">
+                <div class="row between center">
+                    <strong>${esc(g.name)}</strong>
+                    <span class="pill ${st === '已达成' ? 'pill-ok' : 'pill-accent'}">${st}</span>
+                </div>
+                <div style="margin:4px 0;">
+                    <span class="pill pill-muted">${g.track}</span>
+                    <span class="pill pill-muted">权重 ${g.weight}</span>
+                    <span class="pill pill-muted">大奖 ${g.milestone}分</span>
+                    <span class="pill pill-muted">${taskCount}个任务</span>
+                </div>
+                <div class="progress-bar"><div class="progress-fill" style="width:${prog}%"></div></div>
+                <div class="row between center">
+                    <span class="muted">综合进度 ${prog}%</span>
+                    <div class="row" style="gap:6px;">
+                        <button data-testid="goal-btn-edit-${g.id}" onclick="editGoal('${g.id}')" class="secondary" style="padding:4px 10px;font-size:12px;">编辑</button>
+                        <button data-testid="goal-btn-del-${g.id}" onclick="deleteGoal('${g.id}')" class="danger" style="padding:4px 10px;font-size:12px;">删除</button>
+                    </div>
+                </div>
+            </div>`;
+            }).join("");
+        }
+
+        function saveGoal() {
+            const id = $("goal-edit-id").value;
+            const name = $("goal-name").value.trim();
+            if (!name) { toast("目标名称不能为空", "warn"); return; }
+            const data = {
+                name,
+                track: $("goal-track").value,
+                weight: Number($("goal-weight").value) || 50,
+                milestone: Number($("goal-milestone").value) || 0
+            };
+            if (id) {
+                const g = S.goals.find(x => x.id === id);
+                if (g) Object.assign(g, data);
+                toast("目标已更新");
+            } else {
+                S.goals.push({ id: uid(), ...data });
+                toast("目标已添加");
+            }
+            clearGoalForm();
+            saveState(); renderGoals(); refreshGoalSelects();
+        }
+
+        function editGoal(id) {
+            const g = S.goals.find(x => x.id === id);
+            if (!g) return;
+            $("goal-name").value = g.name;
+            $("goal-track").value = g.track;
+            $("goal-weight").value = g.weight;
+            $("goal-milestone").value = g.milestone;
+            $("goal-edit-id").value = g.id;
+            switchTab("goals");
+        }
+
+        async function deleteGoal(id) {
+            const ok = await showModal("删除目标", "确定删除该目标？关联任务的目标将被清空。");
+            if (!ok) return;
+            S.goals = S.goals.filter(x => x.id !== id);
+            S.tasks.forEach(t => { if (t.goalId === id) t.goalId = ""; });
+            clearGoalForm();
+            saveState(); renderGoals(); refreshGoalSelects(); renderTasks();
+            toast("目标已删除");
+        }
+
+        function clearGoalForm() {
+            $("goal-name").value = "";
+            $("goal-track").value = "AI";
+            $("goal-weight").value = 50;
+            $("goal-milestone").value = 0;
+            $("goal-edit-id").value = "";
+        }
+
+        /* 刷新任务表单中的目标下拉 */
+        function refreshGoalSelects() {
+            const opts = '<option value="">-- 选择目标 --</option>' + S.goals.map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join("");
+            $("task-goal").innerHTML = opts;
+            $("quick-goal").innerHTML = opts;
+        }
+
+        /* 目标达成检测 */
+        function checkGoalCelebration(goalId) {
+            if (!goalId) return;
+            const prog = goalProgress(goalId);
+            if (prog >= 100) {
+                const g = S.goals.find(x => x.id === goalId);
+                if (!g) return;
+                const overlay = document.createElement("div");
+                overlay.className = "modal-overlay";
+                overlay.id = "modalOverlay";
+                overlay.innerHTML = `<div class="modal-box celebrate">
+                <h2 style="font-size:28px;">🎉🏆🎉</h2>
+                <h2 style="color:var(--accent2);">目标达成！</h2>
+                <p style="margin:12px 0;">「${esc(g.name)}」综合进度 100%</p>
+                <p class="muted">奖励 ${g.milestone} 大奖积分！</p>
+                <button onclick="closeModal(true)" style="margin-top:16px;">太棒了！</button>
+            </div>`;
+                document.body.appendChild(overlay);
+            }
+        }
+
+        window.editGoal = editGoal;
+        window.deleteGoal = deleteGoal;
+
+        /* ===================================================
+           Step 4: 任务清单 CRUD + 渲染 + 打卡连签 + 快速添加
+           =================================================== */
+        let taskSubView = "all"; // "all" | "p01" | "bygoal"
+
+        function renderTasks() {
+            const container = $("taskListContainer");
+            const active = S.tasks.filter(t => t.status !== "已挂起");
+            const suspended = S.tasks.filter(t => t.status === "已挂起");
+
+            let html = "";
+
+            if (taskSubView === "all") {
+                /* 全景看板：按时间视窗分组 */
+                const groups = {};
+                active.forEach(t => {
+                    const tw = getTimeWindow(t.deadline);
+                    (groups[tw] = groups[tw] || []).push(t);
+                });
+                const sorted = Object.keys(groups).sort();
+                sorted.forEach(tw => {
+                    const tasks = groups[tw].sort((a, b) => a.priority.localeCompare(b.priority));
+                    html += `<div class="group-header">${getTimeWindowLabel(tw)} (${tasks.length})</div>`;
+                    html += tasks.map(t => renderTaskCard(t)).join("");
+                });
+                if (suspended.length) {
+                    html += `<div class="group-header">⏸ 已挂起 (${suspended.length})</div>`;
+                    html += suspended.map(t => renderTaskCard(t)).join("");
+                }
+            } else if (taskSubView === "p01") {
+                /* 核心攻坚：P0+P1 且未完成 */
+                const filtered = active.filter(t => (t.priority === "P0" || t.priority === "P1") && t.status !== "已封包(Done)");
+                if (!filtered.length) html = '<p class="muted">没有进行中的 P0/P1 任务 🎉</p>';
+                else html = filtered.sort((a, b) => a.priority.localeCompare(b.priority)).map(t => renderTaskCard(t)).join("");
+            } else {
+                /* 按目标分组 */
+                const groups = {};
+                S.tasks.forEach(t => {
+                    const gName = t.goalId ? (S.goals.find(g => g.id === t.goalId)?.name || "未知目标") : "未关联目标";
+                    (groups[gName] = groups[gName] || []).push(t);
+                });
+                Object.keys(groups).sort().forEach(gName => {
+                    html += `<div class="group-header">🎯 ${esc(gName)} (${groups[gName].length})</div>`;
+                    html += groups[gName].map(t => renderTaskCard(t)).join("");
+                });
+            }
+
+            if (!html) html = '<p class="muted">暂无任务</p>';
+            container.innerHTML = html;
+            renderTaskKpis();
+        }
+
+        function renderTaskCard(t) {
+            const pts = calcActualPoints(t);
+            const tw = getTimeWindow(t.deadline);
+            const goal = S.goals.find(g => g.id === t.goalId);
+            const goalName = goal ? goal.name : "—";
+            const pillP = { "P0": "pill-danger", "P1": "pill-warn", "P2": "pill-accent", "P3": "pill-muted" }[t.priority] || "pill-muted";
+            const pillS = t.status === "已封包(Done)" ? "pill-ok" : t.status === "进行中" ? "pill-accent" : "pill-muted";
+            const streakHtml = t.type === "habit" && t.streak > 0 ? `<span class="streak-badge">🔥 ${t.streak}天</span>` : "";
+
+            return `<div class="item-card" data-testid="task-card-${t.id}">
+            <div class="row between center wrap">
+                <strong>${esc(t.title)}</strong>
+                <div>${streakHtml}</div>
+            </div>
+            <div style="margin:4px 0;">
+                <span class="pill ${pillP}">${t.priority}</span>
+                <span class="pill ${pillS}">${t.status}</span>
+                <span class="pill pill-muted">${t.type === "habit" ? "习惯" : "普通"}</span>
+                <span class="pill pill-muted">${t.category} ${t.duration}</span>
+                <span class="pill pill-muted">🎯${esc(goalName)}</span>
+            </div>
+            <div class="progress-bar"><div class="progress-fill" style="width:${t.progress}%"></div></div>
+            <div class="row between center wrap" style="font-size:12px;">
+                <span class="muted">进度 ${t.progress}% | base ${t.basePoints} × ${t.weight} = <strong class="text-accent">${pts}分</strong> | ${fmtDate(t.deadline)}</span>
+                <span class="muted">${isValidLabor(t)}</span>
+            </div>
+            ${t.note ? `<div class="muted" style="font-size:12px;margin-top:2px;">📝 ${esc(t.note)}</div>` : ""}
+            ${t.outputUrl ? `<div class="muted" style="font-size:12px;">🔗 <a href="${esc(t.outputUrl)}" target="_blank" rel="noopener" style="color:var(--accent2);">${esc(t.outputUrl)}</a></div>` : ""}
+            <div class="row wrap" style="margin-top:6px;gap:4px;">
+                <button data-testid="task-btn-edit-${t.id}" onclick="editTask('${t.id}')" class="secondary" style="padding:4px 10px;font-size:12px;">编辑</button>
+                <button data-testid="task-btn-done-${t.id}" onclick="markDone('${t.id}')" class="ok-btn" style="padding:4px 10px;font-size:12px;">Done</button>
+                <button data-testid="task-btn-suspend-${t.id}" onclick="suspendTask('${t.id}')" class="secondary" style="padding:4px 10px;font-size:12px;">${t.status === "已挂起" ? "恢复" : "挂起"}</button>
+                <button data-testid="task-btn-archive-${t.id}" onclick="archiveTask('${t.id}')" class="danger" style="padding:4px 10px;font-size:12px;">归档</button>
+            </div>
+        </div>`;
+        }
+
+        function renderTaskKpis() {
+            const { earned, spent, balance } = totals();
+            const active = S.tasks.filter(t => t.status !== "已挂起");
+            const done = active.filter(t => t.status === "已封包(Done)").length;
+            const total = active.length;
+            const rate = total ? Math.round(done / total * 100) : 0;
+            $("taskKpis").innerHTML = `
+            <div class="kpi"><div class="kpi-label">累计获得</div><strong class="text-accent">${earned}</strong></div>
+            <div class="kpi"><div class="kpi-label">已消费</div><strong>${spent}</strong></div>
+            <div class="kpi"><div class="kpi-label">余额</div><strong class="text-accent2">${balance}</strong></div>
+            <div class="kpi"><div class="kpi-label">完成率</div><strong>${rate}%</strong></div>
+        `;
+        }
+
+        function saveTask() {
+            const id = $("task-edit-id").value;
+            const title = $("task-title").value.trim();
+            if (!title) { toast("任务名不能为空", "warn"); return; }
+            const data = {
+                title,
+                goalId: $("task-goal").value,
+                priority: $("task-priority").value,
+                status: $("task-status").value,
+                type: $("task-type").value,
+                category: $("task-category").value,
+                duration: $("task-duration").value,
+                progress: Math.min(100, Math.max(0, Number($("task-progress").value) || 0)),
+                basePoints: Number($("task-base").value) || 0,
+                weight: Number($("task-weight").value) || 1,
+                deadline: $("task-deadline").value ? new Date($("task-deadline").value).toISOString() : null,
+                outputUrl: $("task-output").value.trim(),
+                note: $("task-note").value.trim()
+            };
+            if (id) {
+                const t = S.tasks.find(x => x.id === id);
+                if (t) { Object.assign(t, data, { updatedAt: new Date().toISOString() }); }
+                toast("任务已更新");
+            } else {
+                S.tasks.push({ id: uid(), ...data, streak: 0, lastDoneDate: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+                toast("任务已添加");
+            }
+            clearTaskForm();
+            saveState(); renderTasks(); renderGoals();
+        }
+
+        function quickAddTask() {
+            const title = $("quick-title").value.trim();
+            if (!title) { toast("请输入任务名", "warn"); return; }
+            const goalId = $("quick-goal").value;
+            const dl = $("quick-deadline").value;
+            S.tasks.push({
+                id: uid(), title, goalId, priority: "P2", status: "未开始",
+                type: "normal", category: "general", duration: "30min",
+                progress: 0, basePoints: 10, weight: 1,
+                deadline: dl ? new Date(dl + "T20:30:00").toISOString() : null,
+                outputUrl: "", note: "", streak: 0, lastDoneDate: null,
+                createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+            });
+            $("quick-title").value = "";
+            toast("快速添加成功");
+            saveState(); renderTasks(); renderGoals();
+        }
+
+        function editTask(id) {
+            const t = S.tasks.find(x => x.id === id);
+            if (!t) return;
+            $("task-title").value = t.title;
+            $("task-goal").value = t.goalId || "";
+            $("task-priority").value = t.priority;
+            $("task-status").value = t.status;
+            $("task-type").value = t.type;
+            $("task-category").value = t.category;
+            $("task-duration").value = t.duration;
+            $("task-progress").value = t.progress;
+            $("task-base").value = t.basePoints;
+            $("task-weight").value = t.weight;
+            $("task-deadline").value = toLocalDT(t.deadline);
+            $("task-output").value = t.outputUrl || "";
+            $("task-note").value = t.note || "";
+            $("task-edit-id").value = t.id;
+            switchTab("tasks");
+        }
+
+        function markDone(id) {
+            const t = S.tasks.find(x => x.id === id);
+            if (!t) return;
+            t.status = "已封包(Done)";
+            t.progress = 100;
+            t.updatedAt = new Date().toISOString();
+            /* 连续打卡 */
+            const today = todayStr();
+            if (t.type === "habit") {
+                if (t.lastDoneDate === today) { /* 今天已打卡 */ }
+                else {
+                    const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+                    const yd = yesterday.toISOString().slice(0, 10);
+                    t.streak = (t.lastDoneDate === yd) ? t.streak + 1 : 1;
+                    t.lastDoneDate = today;
+                }
+            }
+            /* 积分日志 */
+            const pts = calcActualPoints(t);
+            if (pts > 0) {
+                S.pointsLog.push({ time: new Date().toISOString(), taskId: t.id, taskTitle: t.title, points: pts, type: "earn" });
+            }
+            saveState(); renderTasks(); renderGoals();
+            toast(`✅ ${t.title} 完成！+${pts}分`);
+            checkGoalCelebration(t.goalId);
+        }
+
+        function suspendTask(id) {
+            const t = S.tasks.find(x => x.id === id);
+            if (!t) return;
+            t.status = t.status === "已挂起" ? "未开始" : "已挂起";
+            t.updatedAt = new Date().toISOString();
+            saveState(); renderTasks();
+            toast(t.status === "已挂起" ? "任务已挂起" : "任务已恢复");
+        }
+
+        async function archiveTask(id) {
+            const ok = await showModal("归档任务", "归档后任务将移出活跃列表（数据保留）。");
+            if (!ok) return;
+            S.tasks = S.tasks.filter(x => x.id !== id);
+            saveState(); renderTasks(); renderGoals();
+            toast("任务已归档");
+        }
+
+        function clearTaskForm() {
+            $("task-title").value = "";
+            $("task-goal").value = "";
+            $("task-priority").value = "P2";
+            $("task-status").value = "未开始";
+            $("task-type").value = "habit";
+            $("task-category").value = "reading";
+            $("task-duration").value = "30min";
+            $("task-progress").value = 0;
+            $("task-base").value = 10;
+            $("task-weight").value = 1;
+            $("task-deadline").value = "";
+            $("task-output").value = "";
+            $("task-note").value = "";
+            $("task-edit-id").value = "";
+        }
+
+        window.editTask = editTask;
+        window.markDone = markDone;
+        window.suspendTask = suspendTask;
+        window.archiveTask = archiveTask;
+
+        /* ===================================================
+           Step 5: 补给站 渲染 + 兑换
+           =================================================== */
+        function renderRewards() {
+            const { balance } = totals();
+            const list = $("rewardList");
+            list.innerHTML = S.rewards.map(r => {
+                const canRedeem = balance >= r.cost && r.stock > r.redeemedCount;
+                const remaining = r.stock - r.redeemedCount;
+                const pillType = { "即时奖励": "pill-ok", "长线奖励": "pill-accent", "里程碑奖励": "pill-warn" }[r.type] || "pill-muted";
+                return `<div class="item-card" data-testid="reward-card-${r.id}">
+                <div class="row between center">
+                    <strong>${esc(r.name)}</strong>
+                    <span class="pill ${pillType}">${r.type}</span>
+                </div>
+                <div class="muted" style="margin:4px 0;">成本 <strong class="text-accent">${r.cost}分</strong> | 剩余 ${remaining} | 已兑 ${r.redeemedCount}</div>
+                ${r.note ? `<div class="muted" style="font-size:12px;">📝 ${esc(r.note)}</div>` : ""}
+                <button data-testid="shop-btn-redeem-${r.id}" onclick="redeemReward('${r.id}')" ${canRedeem ? "" : "disabled"} style="margin-top:6px;font-size:12px;padding:5px 14px;">
+                    ${canRedeem ? "🎉 兑换" : (balance < r.cost ? `还差 ${r.cost - balance} 分` : "库存不足")}
+                </button>
+            </div>`;
+            }).join("");
+        }
+
+        function renderRedemptionLog() {
+            const log = $("redemptionLog");
+            if (!S.redemptions.length) { log.innerHTML = '<p class="muted">暂无兑换记录</p>'; return; }
+            log.innerHTML = S.redemptions.slice().reverse().map(r =>
+                `<div class="item-card"><span class="muted">${fmtDate(r.at)}</span> ${esc(r.rewardName)} <span class="text-danger">-${r.cost}分</span></div>`
+            ).join("");
+        }
+
+        async function redeemReward(id) {
+            const r = S.rewards.find(x => x.id === id);
+            if (!r) return;
+            const { balance } = totals();
+            if (balance < r.cost || r.stock <= r.redeemedCount) { toast("积分不足或库存不足", "warn"); return; }
+            const ok = await showModal("兑换确认", `确认花费 ${r.cost} 积分兑换「${r.name}」？`);
+            if (!ok) return;
+            r.redeemedCount += 1;
+            S.redemptions.push({ id: uid(), rewardId: r.id, rewardName: r.name, cost: r.cost, at: new Date().toISOString() });
+            S.pointsLog.push({ time: new Date().toISOString(), taskId: null, taskTitle: `兑换: ${r.name}`, points: -r.cost, type: "spend" });
+            saveState(); renderRewards(); renderRedemptionLog(); renderTaskKpis();
+            toast(`🎁 成功兑换「${r.name}」！`);
+        }
+        window.redeemReward = redeemReward;
+
+        /* ===================================================
+           Step 6: 复盘 + 进度环 + 流水 + 周报 + 导入导出
+           =================================================== */
+        function renderProgressRing() {
+            const active = S.tasks.filter(t => t.status !== "已挂起");
+            const done = active.filter(t => t.status === "已封包(Done)").length;
+            const total = active.length;
+            const pct = total ? Math.round(done / total * 100) : 0;
+            const r = 42, c = 2 * Math.PI * r, offset = c - (pct / 100) * c;
+            $("progressRing").innerHTML = `
+            <svg width="100" height="100" viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="${r}" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="8"/>
+                <circle cx="50" cy="50" r="${r}" fill="none" stroke="url(#ringGrad)" stroke-width="8"
+                    stroke-dasharray="${c}" stroke-dashoffset="${offset}" stroke-linecap="round"/>
+                <defs><linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="var(--accent)"/><stop offset="100%" stop-color="var(--accent2)"/>
+                </linearGradient></defs>
+            </svg>
+            <div class="ring-label">${pct}%</div>
+        `;
+        }
+
+        function renderReviewKpis() {
+            const { earned, spent, balance } = totals();
+            const today = todayStr();
+            const todayPts = (S.pointsLog || []).filter(l => l.type === "earn" && l.time.startsWith(today)).reduce((s, l) => s + l.points, 0);
+            $("reviewKpis").innerHTML = `
+            <div class="kpi" data-testid="review-total-points"><div class="kpi-label">余额积分</div><strong class="text-accent2">${balance}</strong></div>
+            <div class="kpi" data-testid="review-earned-points"><div class="kpi-label">累计获得</div><strong>${earned}</strong></div>
+            <div class="kpi" data-testid="review-spent-points"><div class="kpi-label">累计消费</div><strong>${spent}</strong></div>
+            <div class="kpi" data-testid="review-today-points"><div class="kpi-label">今日获得</div><strong class="text-ok">${todayPts}</strong></div>
+        `;
+        }
+
+        function renderPointsLog() {
+            const log = $("pointsLog");
+            const items = (S.pointsLog || []).slice(-50).reverse();
+            if (!items.length) { log.innerHTML = '<p class="muted">暂无积分流水</p>'; return; }
+            log.innerHTML = items.map(l => {
+                const cls = l.type === "earn" ? "text-ok" : "text-danger";
+                const sign = l.type === "earn" ? "+" : "";
+                return `<div class="item-card" style="padding:6px 10px;"><span class="muted">${fmtDate(l.time)}</span> ${esc(l.taskTitle)} <strong class="${cls}">${sign}${l.points}</strong></div>`;
+            }).join("");
+        }
+
+        function renderRedeemable() {
+            const { balance } = totals();
+            const items = S.rewards.map(r => {
+                const can = balance >= r.cost && r.stock > r.redeemedCount;
+                const gap = Math.max(0, r.cost - balance);
+                return { ...r, can, gap };
+            }).sort((a, b) => a.gap - b.gap);
+            $("redeemable").innerHTML = items.map(r =>
+                `<div class="item-card" style="padding:6px 10px;">${esc(r.name)} (${r.cost}分): ${r.can ? '<span class="text-ok">✅ 可兑换</span>' : `<span class="text-danger">还差 ${r.gap} 分</span>`}</div>`
+            ).join("");
+        }
+
+        function genDailyReport() {
+            const { earned, spent, balance } = totals();
+            const today = todayStr();
+            const todayDone = S.tasks.filter(t => t.status === "已封包(Done)" && t.updatedAt && t.updatedAt.startsWith(today));
+            const todayPts = todayDone.reduce((s, t) => s + calcActualPoints(t), 0);
+            const lines = [
+                `📊 每日复盘 - ${today}`,
+                `━━━━━━━━━━━━━━━━━━`,
+                `今日完成任务: ${todayDone.length}`,
+                ...todayDone.map(t => `  ✅ ${t.title} (+${calcActualPoints(t)}分)`),
+                `今日获得积分: ${todayPts}`,
+                `累计获得: ${earned} | 累计消费: ${spent} | 余额: ${balance}`,
+                `━━━━━━━━━━━━━━━━━━`,
+                `目标进度:`,
+                ...S.goals.map(g => `  🎯 ${g.name}: ${goalProgress(g.id)}% (${goalStatus(g.id)})`),
+                `━━━━━━━━━━━━━━━━━━`,
+                `可兑换:`,
+                ...S.rewards.filter(r => balance >= r.cost && r.stock > r.redeemedCount).map(r => `  🎁 ${r.name} (${r.cost}分)`),
+            ];
+            $("reviewOutput").value = lines.join("\n");
+        }
+
+        function genWeeklyReport() {
+            const { earned, spent, balance } = totals();
+            const now = new Date();
+            const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 7);
+            const weekTasks = S.tasks.filter(t => t.status === "已封包(Done)" && t.updatedAt && new Date(t.updatedAt) >= weekAgo);
+            const weekPts = weekTasks.reduce((s, t) => s + calcActualPoints(t), 0);
+            const lines = [
+                `📊 周报 - ${weekAgo.toISOString().slice(0, 10)} ~ ${todayStr()}`,
+                `━━━━━━━━━━━━━━━━━━`,
+                `本周完成任务: ${weekTasks.length}`,
+                `本周获得积分: ${weekPts}`,
+                `累计获得: ${earned} | 累计消费: ${spent} | 余额: ${balance}`,
+                `━━━━━━━━━━━━━━━━━━`,
+                `目标进度变动:`,
+                ...S.goals.map(g => `  🎯 ${g.name}: ${goalProgress(g.id)}% (${goalStatus(g.id)})`),
+                `━━━━━━━━━━━━━━━━━━`,
+                `本周完成明细:`,
+                ...weekTasks.map(t => `  ✅ ${t.title} (+${calcActualPoints(t)}分)`),
+                `━━━━━━━━━━━━━━━━━━`,
+                `习惯连签:`,
+                ...S.tasks.filter(t => t.type === "habit" && t.streak > 0).map(t => `  🔥 ${t.title}: ${t.streak}天`),
+            ];
+            $("reviewOutput").value = lines.join("\n");
+        }
+
+        function renderReview() {
+            renderProgressRing();
+            renderReviewKpis();
+            renderPointsLog();
+            renderRedeemable();
+            $("jsonOutput").value = JSON.stringify(S, null, 2);
+        }
+
+        /* 导入导出 */
+        function exportJson() {
+            const blob = new Blob([JSON.stringify(S, null, 2)], { type: "application/json" });
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = `self-discipline-${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(a.href);
+            toast("JSON 已导出");
+        }
+        function importJson(file) {
+            const reader = new FileReader();
+            reader.onload = () => {
+                try {
+                    const data = JSON.parse(reader.result);
+                    if (!data.goals || !data.tasks || !data.rewards) throw new Error("结构不正确");
+                    S = data;
+                    if (!S.pointsLog) S.pointsLog = [];
+                    if (!S.redemptions) S.redemptions = [];
+                    saveState(); refreshAll();
+                    toast("导入成功");
+                } catch (e) { toast("导入失败: " + e.message, "danger"); }
+            };
+            reader.readAsText(file, "utf-8");
+        }
+
+        /* ===================================================
+           Step 7: Tab切换 + 登录 + 事件绑定 + 初始化
+           =================================================== */
+        function switchTab(tab) {
+            const pages = { goals: $("pageGoals"), tasks: $("pageTasks"), shop: $("pageShop"), review: $("pageReview") };
+            const tabs = { goals: $("tabGoals"), tasks: $("tabTasks"), shop: $("tabShop"), review: $("tabReview") };
+            Object.values(pages).forEach(p => p.classList.add("hidden"));
+            Object.values(tabs).forEach(b => { b.classList.remove("active"); b.classList.add("secondary"); });
+            pages[tab].classList.remove("hidden");
+            tabs[tab].classList.add("active");
+            tabs[tab].classList.remove("secondary");
+            if (tab === "review") renderReview();
+        }
+
+        function setTaskSubView(v) {
+            taskSubView = v;
+            ["subAll", "subP01", "subByGoal"].forEach(id => { $(id).classList.remove("active"); $(id).classList.add("secondary"); });
+            const m = { all: "subAll", p01: "subP01", bygoal: "subByGoal" };
+            $(m[v]).classList.add("active"); $(m[v]).classList.remove("secondary");
+            renderTasks();
+        }
+
+        function refreshAll() {
+            refreshGoalSelects();
+            renderGoals();
+            renderTasks();
+            renderRewards();
+            renderRedemptionLog();
+            renderReview();
+        }
+
+        /* 登录 */
+        function isLoggedIn() {
+            try {
+                const s = JSON.parse(localStorage.getItem(SESSION_KEY));
+                return s && s.username && Date.now() < s.expiresAt;
+            } catch (_) { return false; }
+        }
+        function doLogin() {
+            const u = $("login-email").value.trim(), p = $("login-password").value;
+            if (u === AUTH.username && p === AUTH.password) {
+                const days = $("login-remember").checked ? 30 : 1;
+                localStorage.setItem(SESSION_KEY, JSON.stringify({ username: u, expiresAt: Date.now() + days * 864e5 }));
+                $("loginMsg").textContent = "";
+                showMain();
+            } else {
+                $("loginMsg").textContent = "账号或密码错误";
+                $("loginMsg").style.color = "var(--danger)";
+            }
+        }
+        function showMain() { $("loginPanel").classList.add("hidden"); $("mainPanel").classList.remove("hidden"); refreshAll(); }
+        function showLogin() { $("mainPanel").classList.add("hidden"); $("loginPanel").classList.remove("hidden"); }
+        function logout() { localStorage.removeItem(SESSION_KEY); showLogin(); }
+
+        function copyReport() {
+            const text = $("reviewOutput").value;
+            if (!text) { toast("报告为空", "warn"); return; }
+            navigator.clipboard.writeText(text).then(() => toast("已复制到剪贴板")).catch(() => {
+                $("reviewOutput").select(); document.execCommand("copy"); toast("已复制");
+            });
+        }
+
+        /* 事件绑定 */
+        $("login-btn").addEventListener("click", doLogin);
+        $("login-password").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
+        $("btnLogout").addEventListener("click", logout);
+
+        /* Supabase 配置 */
+        $("supa-save-config").addEventListener("click", () => {
+            const url = $("supa-url").value.trim();
+            const key = $("supa-key").value.trim();
+            if (!url || !key) { $("supaConfigMsg").textContent = "请填写完整"; return; }
+            saveSupaConfig(url, key);
+            if (initSupaClient()) {
+                $("supaConfigMsg").textContent = "✅ 配置已保存，可使用云端登录";
+                $("supaConfigMsg").style.color = "var(--ok)";
+            } else {
+                $("supaConfigMsg").textContent = "❌ 初始化失败，请检查配置";
+                $("supaConfigMsg").style.color = "var(--danger)";
+            }
+        });
+
+        /* 云端登录/注册 */
+        $("cloud-login-btn").addEventListener("click", async () => {
+            const email = $("cloud-email").value.trim();
+            const pw = $("cloud-password").value;
+            if (!email || !pw) { $("loginMsg").textContent = "请填写邮箱和密码"; return; }
+            if (!supaClient) {
+                $("loginMsg").textContent = "请先展开并保存 Supabase 配置";
+                $("loginMsg").style.color = "var(--danger)";
+                return;
+            }
+            $("loginMsg").textContent = "登录中...";
+            const ok = await cloudLogin(email, pw);
+            if (ok) {
+                $("loginMsg").textContent = "";
+                showMain();
+            }
+        });
+        $("cloud-register-btn").addEventListener("click", async () => {
+            const email = $("cloud-email").value.trim();
+            const pw = $("cloud-password").value;
+            if (!email || pw.length < 6) { $("loginMsg").textContent = "请填写邮箱，密码至少6位"; return; }
+            if (!supaClient) {
+                $("loginMsg").textContent = "请先展开并保存 Supabase 配置";
+                $("loginMsg").style.color = "var(--danger)";
+                return;
+            }
+            await cloudRegister(email, pw);
+        });
+
+        /* 云端同步按钮 */
+        $("btnCloudSync").addEventListener("click", manualCloudSync);
+
+        $("tabGoals").addEventListener("click", () => switchTab("goals"));
+        $("tabTasks").addEventListener("click", () => switchTab("tasks"));
+        $("tabShop").addEventListener("click", () => switchTab("shop"));
+        $("tabReview").addEventListener("click", () => switchTab("review"));
+
+        $("goal-save").addEventListener("click", saveGoal);
+        $("goal-clear").addEventListener("click", clearGoalForm);
+
+        $("task-save").addEventListener("click", saveTask);
+        $("task-clear").addEventListener("click", clearTaskForm);
+        $("quick-add-btn").addEventListener("click", quickAddTask);
+        $("quick-title").addEventListener("keydown", e => { if (e.key === "Enter") quickAddTask(); });
+
+        $("subAll").addEventListener("click", () => setTaskSubView("all"));
+        $("subP01").addEventListener("click", () => setTaskSubView("p01"));
+        $("subByGoal").addEventListener("click", () => setTaskSubView("bygoal"));
+
+        $("btnExport").addEventListener("click", exportJson);
+        $("btnImport").addEventListener("click", () => $("jsonFile").click());
+        $("jsonFile").addEventListener("change", e => { if (e.target.files[0]) importJson(e.target.files[0]); e.target.value = ""; });
+
+        $("genDailyReport").addEventListener("click", genDailyReport);
+        $("genWeeklyReport").addEventListener("click", genWeeklyReport);
+        $("copyReport").addEventListener("click", copyReport);
+
+        /* 初始化 */
+        /* 加载 Supabase 配置 */
+        (function initCloud() {
+            const cfg = loadSupaConfig();
+            if (cfg) {
+                $("supa-url").value = cfg.url || "";
+                $("supa-key").value = cfg.key || "";
+                initSupaClient();
+            }
+            /* 检查是否有活跃的 Supabase session */
+            if (supaClient) {
+                supaClient.auth.getSession().then(({ data }) => {
+                    if (data.session) {
+                        cloudMode = true;
+                        cloudUserId = data.session.user.id;
+                        showMain();
+                    }
+                });
+            }
+        })();
+        if (isLoggedIn()) showMain(); else showLogin();
+    </script>
+</body>
+
+</html>
