@@ -808,21 +808,21 @@
         function loadSupaConfig() {
             try {
                 const stored = JSON.parse(localStorage.getItem(SUPA_CONFIG_KEY));
-                if (stored && stored.url && stored.key) return stored;
+                if (stored && stored.url && stored.key && stored.userSaved) return stored;
             } catch (_) { }
-            return { url: DEFAULT_SUPA_URL, key: DEFAULT_SUPA_KEY };
+            return null;
         }
         function saveSupaConfig(url, key) {
-            localStorage.setItem(SUPA_CONFIG_KEY, JSON.stringify({ url, key }));
+            localStorage.setItem(SUPA_CONFIG_KEY, JSON.stringify({ url, key, userSaved: true }));
         }
 
         function initSupaClient() {
             const cfg = loadSupaConfig();
-            if (!cfg || !cfg.url || !cfg.key) return false;
+            if (!cfg || !cfg.url || !cfg.key) { supaClient = null; return false; }
             try {
                 supaClient = window.supabase.createClient(cfg.url, cfg.key);
                 return true;
-            } catch (e) { console.error("Supabase init failed", e); return false; }
+            } catch (e) { console.error("Supabase init failed", e); supaClient = null; return false; }
         }
 
         /* 云端注册 */
@@ -870,14 +870,20 @@
             if (data && data.data) {
                 try {
                     const cloudData = JSON.parse(data.data);
-                    if (cloudData.goals && cloudData.tasks && cloudData.rewards &&
-                        (cloudData.tasks.length > 0 || cloudData.goals.length > 0)) {
-                        S = cloudData;
-                        if (!S.pointsLog) S.pointsLog = [];
-                        if (!S.redemptions) S.redemptions = [];
-                        saveState();
-                        toast("☁️ 已从云端同步数据");
+                    if (!cloudData.goals || !cloudData.tasks || !cloudData.rewards) return;
+                    /* 只有云端数据非空时才覆盖本地 */
+                    const cloudItems = (cloudData.tasks?.length || 0) + (cloudData.goals?.length || 0) + (cloudData.pointsLog?.length || 0);
+                    const localItems = (S.tasks?.length || 0) + (S.goals?.length || 0) + (S.pointsLog?.length || 0);
+                    if (cloudItems === 0 && localItems > 0) {
+                        /* 云端为空但本地有数据，推送本地到云端 */
+                        await cloudPush();
+                        return;
                     }
+                    S = cloudData;
+                    if (!S.pointsLog) S.pointsLog = [];
+                    if (!S.redemptions) S.redemptions = [];
+                    saveState();
+                    toast("☁️ 已从云端同步数据");
                 } catch (e) { console.error("Parse cloud data error:", e); }
             }
         }
@@ -1853,7 +1859,11 @@
             const email = $("cloud-email").value.trim();
             const pw = $("cloud-password").value;
             if (!email || !pw) { $("loginMsg").textContent = "请填写邮箱和密码"; return; }
-            if (!supaClient) initSupaClient();
+            if (!supaClient) {
+                /* 用户没有手动配置过，用默认 Supabase 配置 */
+                saveSupaConfig(DEFAULT_SUPA_URL, DEFAULT_SUPA_KEY);
+                initSupaClient();
+            }
             if (!supaClient) {
                 $("loginMsg").textContent = "Supabase 初始化失败，请刷新重试";
                 $("loginMsg").style.color = "var(--danger)";
@@ -1870,7 +1880,10 @@
             const email = $("cloud-email").value.trim();
             const pw = $("cloud-password").value;
             if (!email || pw.length < 6) { $("loginMsg").textContent = "请填写邮箱，密码至少6位"; return; }
-            if (!supaClient) initSupaClient();
+            if (!supaClient) {
+                saveSupaConfig(DEFAULT_SUPA_URL, DEFAULT_SUPA_KEY);
+                initSupaClient();
+            }
             if (!supaClient) {
                 $("loginMsg").textContent = "Supabase 初始化失败，请刷新重试";
                 $("loginMsg").style.color = "var(--danger)";
@@ -1933,16 +1946,16 @@
                 $("supa-url").value = cfg.url || "";
                 $("supa-key").value = cfg.key || "";
                 initSupaClient();
-            }
-            /* 检查是否有活跃的 Supabase session */
-            if (supaClient) {
-                supaClient.auth.getSession().then(({ data }) => {
-                    if (data.session) {
-                        cloudMode = true;
-                        cloudUserId = data.session.user.id;
-                        showMain();
-                    }
-                });
+                /* 只有用户明确配置过才检查云端 session */
+                if (supaClient) {
+                    supaClient.auth.getSession().then(({ data }) => {
+                        if (data.session) {
+                            cloudMode = true;
+                            cloudUserId = data.session.user.id;
+                            cloudPull().then(() => { showMain(); refreshAll(); });
+                        }
+                    }).catch(() => {});
+                }
             }
         })();
         if (isLoggedIn()) showMain(); else showLogin();
