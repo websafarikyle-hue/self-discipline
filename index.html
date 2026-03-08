@@ -539,8 +539,8 @@
         <section id="loginPanel" class="card" style="max-width:400px;margin:40px auto;">
             <h1 style="text-align:center;">🎯 自律系统</h1>
 
-            <!-- Supabase 配置（首次需要填写） -->
-            <div class="card" style="margin:12px 0;padding:10px;">
+            <!-- Supabase 配置（已内置默认，高级用户可覆盖） -->
+            <div class="card" style="margin:12px 0;padding:10px;display:none;">
                 <div class="row between center" style="cursor:pointer;"
                     onclick="$('supaConfig').classList.toggle('hidden')">
                     <span class="muted" style="font-size:13px;">☁️ 云端同步配置（点击展开）</span>
@@ -1730,8 +1730,9 @@
             const email = $("cloud-email").value.trim();
             const pw = $("cloud-password").value;
             if (!email || !pw) { $("loginMsg").textContent = "请填写邮箱和密码"; return; }
+            if (!supaClient) initSupaClient();
             if (!supaClient) {
-                $("loginMsg").textContent = "请先展开并保存 Supabase 配置";
+                $("loginMsg").textContent = "Supabase 初始化失败，请刷新重试";
                 $("loginMsg").style.color = "var(--danger)";
                 return;
             }
@@ -1746,8 +1747,9 @@
             const email = $("cloud-email").value.trim();
             const pw = $("cloud-password").value;
             if (!email || pw.length < 6) { $("loginMsg").textContent = "请填写邮箱，密码至少6位"; return; }
+            if (!supaClient) initSupaClient();
             if (!supaClient) {
-                $("loginMsg").textContent = "请先展开并保存 Supabase 配置";
+                $("loginMsg").textContent = "Supabase 初始化失败，请刷新重试";
                 $("loginMsg").style.color = "var(--danger)";
                 return;
             }
