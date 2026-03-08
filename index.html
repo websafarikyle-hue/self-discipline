@@ -754,8 +754,15 @@
         let cloudMode = false; // true = data syncs to Supabase
         let cloudUserId = null;
 
+        const DEFAULT_SUPA_URL = "https://cbgcobqbyyejjbwttfpe.supabase.co";
+        const DEFAULT_SUPA_KEY = "sb_publishable_hT5oO-vDQk1nVWR9y29-Xg_FCbUiE6x";
+
         function loadSupaConfig() {
-            try { return JSON.parse(localStorage.getItem(SUPA_CONFIG_KEY)) || null; } catch (_) { return null; }
+            try {
+                const stored = JSON.parse(localStorage.getItem(SUPA_CONFIG_KEY));
+                if (stored && stored.url && stored.key) return stored;
+            } catch (_) {}
+            return { url: DEFAULT_SUPA_URL, key: DEFAULT_SUPA_KEY };
         }
         function saveSupaConfig(url, key) {
             localStorage.setItem(SUPA_CONFIG_KEY, JSON.stringify({ url, key }));
