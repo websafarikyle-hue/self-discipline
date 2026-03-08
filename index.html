@@ -1369,7 +1369,11 @@
             };
             if (id) {
                 const t = S.tasks.find(x => x.id === id);
-                if (t) { Object.assign(t, data, { updatedAt: new Date().toISOString() }); }
+                if (t) {
+                    const keepStatus = t.status; // 保留原状态不回退
+                    const keepProgress = Math.max(data.progress, t.progress);
+                    Object.assign(t, data, { status: keepStatus, progress: keepProgress, updatedAt: new Date().toISOString() });
+                }
                 toast("任务已更新");
             } else {
                 S.tasks.push({ id: uid(), ...data, streak: 0, lastDoneDate: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
@@ -1607,7 +1611,7 @@
            Step 6: 复盘 + 进度环 + 流水 + 周报 + 导入导出
            =================================================== */
         function renderProgressRing() {
-            const active = S.tasks.filter(t => t.status !== "已挂起");
+            const active = S.tasks.filter(t => !t.archived && t.status !== "已挂起");
             const done = active.filter(t => t.status === "已封包(Done)").length;
             const total = active.length;
             const pct = total ? Math.round(done / total * 100) : 0;
@@ -1628,7 +1632,7 @@
         function renderReviewKpis() {
             const { earned, spent, balance } = totals();
             const today = todayStr();
-            const todayPts = (S.pointsLog || []).filter(l => l.type === "earn" && l.time.startsWith(today)).reduce((s, l) => s + l.points, 0);
+            const todayPts = (S.pointsLog || []).filter(l => (l.type === "earn" || l.type === "manual" || l.type === "milestone") && l.time.startsWith(today)).reduce((s, l) => s + l.points, 0);
             $("reviewKpis").innerHTML = `
             <div class="kpi" data-testid="review-total-points"><div class="kpi-label">余额积分</div><strong class="text-accent2">${balance}</strong></div>
             <div class="kpi" data-testid="review-earned-points"><div class="kpi-label">累计获得</div><strong>${earned}</strong></div>
@@ -1642,8 +1646,9 @@
             const items = (S.pointsLog || []).slice(-50).reverse();
             if (!items.length) { log.innerHTML = '<p class="muted">暂无积分流水</p>'; return; }
             log.innerHTML = items.map(l => {
-                const cls = l.type === "earn" ? "text-ok" : "text-danger";
-                const sign = l.type === "earn" ? "+" : "";
+                const isPositive = l.type === "earn" || l.type === "manual" || l.type === "milestone";
+                const cls = isPositive ? "text-ok" : "text-danger";
+                const sign = isPositive ? "+" : "";
                 return `<div class="item-card" style="padding:6px 10px;"><span class="muted">${fmtDate(l.time)}</span> ${esc(l.taskTitle)} <strong class="${cls}">${sign}${l.points}</strong></div>`;
             }).join("");
         }
