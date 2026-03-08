@@ -1247,8 +1247,10 @@
 
         function renderTasks() {
             const container = $("taskListContainer");
-            const active = S.tasks.filter(t => t.status !== "已挂起");
-            const suspended = S.tasks.filter(t => t.status === "已挂起");
+            const liveTasks = S.tasks.filter(t => !t.archived);
+            const archivedTasks = S.tasks.filter(t => t.archived);
+            const active = liveTasks.filter(t => t.status !== "已挂起");
+            const suspended = liveTasks.filter(t => t.status === "已挂起");
 
             let html = "";
 
@@ -1277,7 +1279,7 @@
             } else {
                 /* 按目标分组 */
                 const groups = {};
-                S.tasks.forEach(t => {
+                liveTasks.forEach(t => {
                     const gName = t.goalId ? (S.goals.find(g => g.id === t.goalId)?.name || "未知目标") : "未关联目标";
                     (groups[gName] = groups[gName] || []).push(t);
                 });
@@ -1288,6 +1290,33 @@
             }
 
             if (!html) html = '<p class="muted">暂无任务</p>';
+
+            /* 归档任务折叠区 */
+            if (archivedTasks.length) {
+                html += `<div class="group-header" style="cursor:pointer;" onclick="document.getElementById('archivedTasksList').classList.toggle('hidden')">📦 已归档任务 (${archivedTasks.length}) ▾</div>`;
+                html += `<div id="archivedTasksList" class="hidden">`;
+                html += archivedTasks.map(t => {
+                    const basePts = Number(t.basePoints || 0);
+                    const isDone = t.status === "已封包(Done)";
+                    const goal = S.goals.find(g => g.id === t.goalId);
+                    const goalName = goal ? goal.name : "—";
+                    return `<div class="item-card" style="opacity:0.7;">
+                        <div class="row between center wrap">
+                            <strong>${esc(t.title)}</strong>
+                            <span class="pill ${isDone ? 'pill-ok' : 'pill-muted'}">${isDone ? '✅ +' + basePts + '分' : t.status}</span>
+                        </div>
+                        <div style="margin:4px 0;">
+                            <span class="pill pill-muted">🎯${esc(goalName)}</span>
+                            ${t.archivedAt ? `<span class="muted" style="font-size:11px;">归档于 ${fmtDate(t.archivedAt)}</span>` : ''}
+                        </div>
+                        <div class="row" style="margin-top:4px;gap:4px;">
+                            <button onclick="restoreTask('${t.id}')" class="secondary" style="padding:4px 10px;font-size:12px;">恢复</button>
+                        </div>
+                    </div>`;
+                }).join("");
+                html += `</div>`;
+            }
+
             container.innerHTML = html;
             renderTaskKpis();
         }
@@ -1331,7 +1360,8 @@
 
         function renderTaskKpis() {
             const { earned, spent, balance } = totals();
-            const active = S.tasks.filter(t => t.status !== "已挂起");
+            const liveTasks = S.tasks.filter(t => !t.archived);
+            const active = liveTasks.filter(t => t.status !== "已挂起");
             const done = active.filter(t => t.status === "已封包(Done)").length;
             const total = active.length;
             const rate = total ? Math.round(done / total * 100) : 0;
@@ -1446,11 +1476,23 @@
         }
 
         async function archiveTask(id) {
-            const ok = await showModal("归档任务", "归档后任务将移出活跃列表（数据保留）。");
+            const ok = await showModal("归档任务", "归档后任务将移出活跃列表，已获得的积分保留。");
             if (!ok) return;
-            S.tasks = S.tasks.filter(x => x.id !== id);
+            const t = S.tasks.find(x => x.id === id);
+            if (!t) return;
+            t.archived = true;
+            t.archivedAt = new Date().toISOString();
             saveState(); renderTasks(); renderGoals();
             toast("任务已归档");
+        }
+
+        function restoreTask(id) {
+            const t = S.tasks.find(x => x.id === id);
+            if (!t) return;
+            t.archived = false;
+            t.archivedAt = null;
+            saveState(); renderTasks();
+            toast("任务已恢复");
         }
 
         function updateTaskProgress(taskId, val) {
@@ -1482,6 +1524,7 @@
         window.markDone = markDone;
         window.suspendTask = suspendTask;
         window.archiveTask = archiveTask;
+        window.restoreTask = restoreTask;
 
         /* ===================================================
            Step 5: 补给站 渲染 + 兑换
