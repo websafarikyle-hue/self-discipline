@@ -795,12 +795,13 @@
 
     <script>
         /* ===================================================
-           Supabase 云端同步层
+           Supabase 云端同步层（完全隔离，仅云端登录后激活）
            =================================================== */
         const SUPA_CONFIG_KEY = "sdv2_supa_config";
         let supaClient = null;
-        let cloudMode = false; // true = data syncs to Supabase
+        let cloudMode = false;
         let cloudUserId = null;
+        let _skipCloudPush = false; // 防止 cloudPull→saveState→cloudPush 循环
 
         const DEFAULT_SUPA_URL = "https://cbgcobqbyyejjbwttfpe.supabase.co";
         const DEFAULT_SUPA_KEY = "sb_publishable_hT5oO-vDQk1nVWR9y29-Xg_FCbUiE6x";
@@ -809,7 +810,6 @@
             try {
                 const stored = JSON.parse(localStorage.getItem(SUPA_CONFIG_KEY));
                 if (stored && stored.url && stored.key && stored.userSaved) return stored;
-                /* 清理旧格式配置（无 userSaved 标记的） */
                 if (stored && !stored.userSaved) localStorage.removeItem(SUPA_CONFIG_KEY);
             } catch (_) { }
             return null;
@@ -827,28 +827,41 @@
             } catch (e) { console.error("Supabase init failed", e); supaClient = null; return false; }
         }
 
-        /* 云端注册 */
+        function ensureSupaClient() {
+            if (supaClient) return true;
+            const cfg = loadSupaConfig();
+            if (!cfg) {
+                saveSupaConfig(DEFAULT_SUPA_URL, DEFAULT_SUPA_KEY);
+            }
+            return initSupaClient();
+        }
+
         async function cloudRegister(email, password) {
-            if (!supaClient) { toast("请先配置 Supabase", "warn"); return false; }
+            if (!supaClient) { toast("Supabase 未初始化", "warn"); return false; }
             const { data, error } = await supaClient.auth.signUp({ email, password });
             if (error) { toast("注册失败: " + error.message, "danger"); return false; }
             toast("注册成功！请检查邮箱确认（部分项目可直接登录）");
             return true;
         }
 
-        /* 云端登录 */
         async function cloudLogin(email, password) {
-            if (!supaClient) { toast("请先配置 Supabase", "warn"); return false; }
+            if (!supaClient) { toast("Supabase 未初始化", "warn"); return false; }
             const { data, error } = await supaClient.auth.signInWithPassword({ email, password });
             if (error) { toast("登录失败: " + error.message, "danger"); return false; }
             cloudMode = true;
             cloudUserId = data.user.id;
-            /* 从云端拉取数据 */
             await cloudPull();
             return true;
         }
 
-        /* 推送数据到云端 */
+        async function cloudLogout() {
+            if (supaClient) {
+                try { await supaClient.auth.signOut(); } catch (_) {}
+            }
+            cloudMode = false;
+            cloudUserId = null;
+        }
+
         async function cloudPush() {
             if (!cloudMode || !supaClient || !cloudUserId) return;
             const payload = { user_id: cloudUserId, data: JSON.stringify(S), updated_at: new Date().toISOString() };
@@ -856,13 +869,11 @@
             if (error) { console.error("Cloud push error:", error); toast("云端同步失败", "danger"); }
         }
 
-        /* 从云端拉取数据 */
         async function cloudPull() {
             if (!supaClient || !cloudUserId) return;
             const { data, error } = await supaClient.from("user_data").select("data").eq("user_id", cloudUserId).single();
             if (error) {
                 if (error.code === "PGRST116") {
-                    /* 云端无数据，推送当前本地数据 */
                     await cloudPush();
                     return;
                 }
@@ -873,24 +884,17 @@
                 try {
                     const cloudData = JSON.parse(data.data);
                     if (!cloudData.goals || !cloudData.tasks || !cloudData.rewards) return;
-                    /* 只有云端数据非空时才覆盖本地 */
-                    const cloudItems = (cloudData.tasks?.length || 0) + (cloudData.goals?.length || 0) + (cloudData.pointsLog?.length || 0);
-                    const localItems = (S.tasks?.length || 0) + (S.goals?.length || 0) + (S.pointsLog?.length || 0);
-                    if (cloudItems === 0 && localItems > 0) {
-                        /* 云端为空但本地有数据，推送本地到云端 */
-                        await cloudPush();
-                        return;
-                    }
                     S = cloudData;
                     if (!S.pointsLog) S.pointsLog = [];
                     if (!S.redemptions) S.redemptions = [];
+                    _skipCloudPush = true;
                     saveState();
+                    _skipCloudPush = false;
                     toast("☁️ 已从云端同步数据");
                 } catch (e) { console.error("Parse cloud data error:", e); }
             }
         }
 
-        /* 手动同步按钮 */
         async function manualCloudSync() {
             if (!cloudMode) { toast("未启用云端模式，请用云端账号登录", "warn"); return; }
             toast("正在同步...");
@@ -898,17 +902,13 @@
             toast("☁️ 数据已同步到云端");
         }
 
-        /* 覆写 saveState，在云端模式下自动推送 */
-        const _origSaveStateKey = "sdv2_data";
-
         /* ===================================================
-           Step 2: 数据模型 + 持久化 + 工具函数
+           数据模型 + 持久化
            =================================================== */
         const STORAGE_KEY = "sdv2_data";
         const SESSION_KEY = "sdv2_session";
         const AUTH = { username: "admin", password: "123456" };
 
-        /* --- 默认奖励 --- */
         const DEFAULT_REWARDS = [
             { id: "r1", name: "奶茶", cost: 30, stock: 99, redeemedCount: 0, type: "即时奖励", note: "" },
             { id: "r2", name: "夜宵", cost: 60, stock: 99, redeemedCount: 0, type: "即时奖励", note: "" },
@@ -918,19 +918,11 @@
         ];
 
         function seedState() {
-            return {
-                goals: [],
-                tasks: [],
-                rewards: structuredClone(DEFAULT_REWARDS),
-                redemptions: [],
-                pointsLog: []
-            };
+            return { goals: [], tasks: [], rewards: structuredClone(DEFAULT_REWARDS), redemptions: [], pointsLog: [] };
         }
 
-        /* --- UID --- */
         function uid() { return crypto.randomUUID().slice(0, 8); }
 
-        /* --- 持久化 --- */
         function loadState() {
             try {
                 const raw = localStorage.getItem(STORAGE_KEY);
@@ -945,10 +937,10 @@
             } catch (_) { }
             return seedState();
         }
+
         function saveState() {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(S));
-            /* 云端模式下自动推送（防抖2秒） */
-            if (cloudMode) {
+            if (cloudMode && !_skipCloudPush) {
                 clearTimeout(saveState._timer);
                 saveState._timer = setTimeout(() => cloudPush(), 2000);
             }
@@ -1818,6 +1810,7 @@
                 const days = $("login-remember").checked ? 30 : 1;
                 localStorage.setItem(SESSION_KEY, JSON.stringify({ username: u, expiresAt: Date.now() + days * 864e5 }));
                 $("loginMsg").textContent = "";
+                S = loadState(); // 重新加载本地数据
                 showMain();
             } else {
                 $("loginMsg").textContent = "账号或密码错误";
@@ -1826,7 +1819,13 @@
         }
         function showMain() { $("loginPanel").classList.add("hidden"); $("mainPanel").classList.remove("hidden"); refreshAll(); }
         function showLogin() { $("mainPanel").classList.add("hidden"); $("loginPanel").classList.remove("hidden"); }
-        function logout() { localStorage.removeItem(SESSION_KEY); showLogin(); }
+        async function logout() {
+            localStorage.removeItem(SESSION_KEY);
+            if (cloudMode) await cloudLogout();
+            // 清理 Supabase SDK 遗留的 localStorage keys
+            Object.keys(localStorage).filter(k => k.startsWith("sb-")).forEach(k => localStorage.removeItem(k));
+            showLogin();
+        }
 
         function copyReport() {
             const text = $("reviewOutput").value;
@@ -1839,7 +1838,7 @@
         /* 事件绑定 */
         $("login-btn").addEventListener("click", doLogin);
         $("login-password").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
-        $("btnLogout").addEventListener("click", logout);
+        $("btnLogout").addEventListener("click", () => logout());
 
         /* Supabase 配置 */
         $("supa-save-config").addEventListener("click", () => {
@@ -1940,27 +1939,30 @@
         $("genWeeklyReport").addEventListener("click", genWeeklyReport);
         $("copyReport").addEventListener("click", copyReport);
 
-        /* 初始化 */
-        /* 加载 Supabase 配置 */
-        (function initCloud() {
+        /* 初始化：先检查云端会话，无则检查本地离线会话 */
+        (async function initApp() {
+            let cloudSessionFound = false;
             const cfg = loadSupaConfig();
             if (cfg) {
                 $("supa-url").value = cfg.url || "";
                 $("supa-key").value = cfg.key || "";
-                initSupaClient();
-                /* 只有用户明确配置过才检查云端 session */
-                if (supaClient) {
-                    supaClient.auth.getSession().then(({ data }) => {
+                if (initSupaClient() && supaClient) {
+                    try {
+                        const { data } = await supaClient.auth.getSession();
                         if (data.session) {
                             cloudMode = true;
                             cloudUserId = data.session.user.id;
-                            cloudPull().then(() => { showMain(); refreshAll(); });
+                            cloudSessionFound = true;
+                            await cloudPull();
+                            showMain();
                         }
-                    }).catch(() => {});
+                    } catch (_) {}
                 }
             }
+            if (!cloudSessionFound) {
+                if (isLoggedIn()) showMain(); else showLogin();
+            }
         })();
-        if (isLoggedIn()) showMain(); else showLogin();
     </script>
 </body>
 
