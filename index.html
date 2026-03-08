@@ -625,12 +625,7 @@
                     <h2>🎯 新增 / 编辑战略目标</h2>
                     <div class="form-grid">
                         <input id="goal-name" data-testid="goal-input-name" placeholder="目标名称">
-                        <select id="goal-track" data-testid="goal-select-track">
-                            <option value="AI">AI</option>
-                            <option value="Web3">Web3</option>
-                            <option value="量化金融">量化金融</option>
-                            <option value="学术学位">学术学位</option>
-                        </select>
+                        <input id="goal-tag" data-testid="goal-input-tag" placeholder="标签(可选，如:学习/健康/副业)">
                         <input id="goal-milestone" data-testid="goal-input-milestone" type="number" min="0" value="0"
                             placeholder="达成奖励积分">
                     </div>
@@ -914,10 +909,7 @@
 
         /* --- 默认目标 --- */
         const DEFAULT_GOALS = [
-            { id: "g1", name: "AI 技术精进", track: "AI", milestone: 200, progress: 0 },
-            { id: "g2", name: "Web3 探索", track: "Web3", milestone: 150, progress: 0 },
-            { id: "g3", name: "量化策略研发", track: "量化金融", milestone: 180, progress: 0 },
-            { id: "g4", name: "学位论文推进", track: "学术学位", milestone: 250, progress: 0 }
+            { id: "g1", name: "示例目标", tag: "", milestone: 100, progress: 0 }
         ];
 
         /* --- 默认任务模板 --- */
@@ -1080,7 +1072,7 @@
                     <span class="pill ${st === '已达成' ? 'pill-ok' : 'pill-accent'}">${st}</span>
                 </div>
                 <div style="margin:4px 0;">
-                    <span class="pill pill-muted">${g.track}</span>
+                    ${g.tag ? `<span class="pill pill-muted">${esc(g.tag)}</span>` : ''}
                     <span class="pill pill-muted">达成奖 ${g.milestone}分</span>
                     <span class="pill pill-muted">${taskCount}个任务</span>
                 </div>
@@ -1109,7 +1101,7 @@
                         <span class="pill pill-ok">已归档</span>
                     </div>
                     <div style="margin:4px 0;">
-                        <span class="pill pill-muted">${g.track}</span>
+                        ${g.tag ? `<span class="pill pill-muted">${esc(g.tag)}</span>` : ''}
                         <span class="pill pill-muted">${taskCount}个任务</span>
                         ${g.archivedAt ? `<span class="muted" style="font-size:11px;">归档于 ${fmtDate(g.archivedAt)}</span>` : ''}
                     </div>
@@ -1139,7 +1131,7 @@
             if (!name) { toast("目标名称不能为空", "warn"); return; }
             const data = {
                 name,
-                track: $("goal-track").value,
+                tag: $("goal-tag").value.trim(),
                 milestone: Number($("goal-milestone").value) || 0,
                 progress: Number($("goal-progress").value) || 0
             };
@@ -1159,7 +1151,7 @@
             const g = S.goals.find(x => x.id === id);
             if (!g) return;
             $("goal-name").value = g.name;
-            $("goal-track").value = g.track;
+            $("goal-tag").value = g.tag || g.track || "";
             $("goal-milestone").value = g.milestone;
             $("goal-progress").value = g.progress || 0;
             $("goal-progress-val").textContent = g.progress || 0;
@@ -1179,7 +1171,7 @@
 
         function clearGoalForm() {
             $("goal-name").value = "";
-            $("goal-track").value = "AI";
+            $("goal-tag").value = "";
             $("goal-milestone").value = 0;
             $("goal-progress").value = 0;
             $("goal-progress-val").textContent = "0";
@@ -1301,13 +1293,16 @@
         }
 
         function renderTaskCard(t) {
-            const pts = calcActualPoints(t);
+            const basePts = Number(t.basePoints || 0);
+            const isDone = t.status === "已封包(Done)";
             const tw = getTimeWindow(t.deadline);
             const goal = S.goals.find(g => g.id === t.goalId);
             const goalName = goal ? goal.name : "—";
             const pillP = { "P0": "pill-danger", "P1": "pill-warn", "P2": "pill-accent", "P3": "pill-muted" }[t.priority] || "pill-muted";
-            const pillS = t.status === "已封包(Done)" ? "pill-ok" : t.status === "进行中" ? "pill-accent" : "pill-muted";
+            const pillS = isDone ? "pill-ok" : t.status === "进行中" ? "pill-accent" : "pill-muted";
             const streakHtml = t.type === "habit" && t.streak > 0 ? `<span class="streak-badge">🔥 ${t.streak}天</span>` : "";
+            const ptsLabel = isDone ? `✅ +${basePts}分` : `🏆 ${basePts}分`;
+            const ptsPill = isDone ? "pill-ok" : "pill-accent";
 
             return `<div class="item-card" data-testid="task-card-${t.id}">
             <div class="row between center wrap">
@@ -1316,7 +1311,7 @@
             </div>
             <div style="margin:4px 0;">
                 <span class="pill pill-muted">🎯${esc(goalName)}</span>
-                <span class="pill pill-accent">${pts}分</span>
+                <span class="pill ${ptsPill}">${ptsLabel}</span>
                 <span class="muted" style="font-size:12px;">${fmtDate(t.deadline)}</span>
             </div>
             <div class="row center" style="gap:8px;">
