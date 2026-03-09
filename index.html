@@ -564,16 +564,15 @@
 
             <!-- 离线模式（本地账号） -->
             <div class="card" style="padding:10px;margin-bottom:8px;">
-                <p class="muted" style="font-size:12px;margin-bottom:6px;">📌 <strong>离线模式</strong>（数据存本地浏览器）</p>
+                <p class="muted" style="font-size:12px;margin-bottom:6px;">📌 <strong>离线模式</strong>（数据存本地浏览器，按用户名隔离）</p>
                 <div class="form-grid" style="grid-template-columns:1fr;">
-                    <input id="login-email" data-testid="login-input-username" placeholder="用户名" value="admin">
-                    <input id="login-password" data-testid="login-input-password" placeholder="密码" type="password"
-                        value="123456">
+                    <input id="login-username" data-testid="login-input-username" placeholder="输入用户名即可进入">
                     <label class="row center" style="font-size:13px;"><input id="login-remember"
                             data-testid="login-checkbox-remember" type="checkbox" checked
                             style="width:auto;margin-right:6px;"> 记住登录 30 天</label>
-                    <button id="login-btn" data-testid="login-btn-submit" style="width:100%;">离线登录</button>
+                    <button id="login-btn" data-testid="login-btn-submit" style="width:100%;">进入系统</button>
                 </div>
+                <div id="localUserList" data-testid="local-user-list" style="margin-top:8px;"></div>
             </div>
 
             <!-- 云端模式（Supabase 账号） -->
@@ -605,7 +604,8 @@
                     <button id="tabShop" data-testid="nav-tab-shop" class="secondary">💎 补给站</button>
                     <button id="tabReview" data-testid="nav-tab-review" class="secondary">📊 复盘</button>
                 </div>
-                <div class="row wrap" style="gap:6px;">
+                <div class="row wrap center" style="gap:6px;">
+                    <span id="currentUserLabel" data-testid="current-user-label" class="pill pill-accent" style="font-size:12px;"></span>
                     <button id="btnCloudSync" data-testid="system-btn-cloud-sync" class="secondary"
                         style="font-size:12px;">☁️ 同步</button>
                     <button id="btnExport" data-testid="system-btn-export" class="secondary"
@@ -850,13 +850,14 @@
             if (error) { toast("登录失败: " + error.message, "danger"); return false; }
             cloudMode = true;
             cloudUserId = data.user.id;
+            currentUser = "cloud_" + data.user.id.slice(0, 8);
             await cloudPull();
             return true;
         }
 
         async function cloudLogout() {
             if (supaClient) {
-                try { await supaClient.auth.signOut(); } catch (_) {}
+                try { await supaClient.auth.signOut(); } catch (_) { }
             }
             cloudMode = false;
             cloudUserId = null;
@@ -903,11 +904,38 @@
         }
 
         /* ===================================================
-           数据模型 + 持久化
+           数据模型 + 持久化（按用户分片）
            =================================================== */
-        const STORAGE_KEY = "sdv2_data";
+        const STORAGE_PREFIX = "sdv2_data_";
         const SESSION_KEY = "sdv2_session";
-        const AUTH = { username: "admin", password: "123456" };
+        let currentUser = null; // 当前登录的用户名（离线）或 Supabase user.id（云端）
+
+        function storageKey() {
+            return STORAGE_PREFIX + (currentUser || "default");
+        }
+
+        /* 扫描本地所有已有用户 */
+        function getLocalUsers() {
+            const users = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (k.startsWith(STORAGE_PREFIX)) {
+                    users.push(k.slice(STORAGE_PREFIX.length));
+                }
+            }
+            return users.sort();
+        }
+
+        /* 迁移旧数据：如果存在旧的 sdv2_data 单一key，迁移到 sdv2_data_admin */
+        (function migrateOldData() {
+            const old = localStorage.getItem("sdv2_data");
+            if (old) {
+                if (!localStorage.getItem(STORAGE_PREFIX + "admin")) {
+                    localStorage.setItem(STORAGE_PREFIX + "admin", old);
+                }
+                localStorage.removeItem("sdv2_data");
+            }
+        })();
 
         const DEFAULT_REWARDS = [
             { id: "r1", name: "奶茶", cost: 30, stock: 99, redeemedCount: 0, type: "即时奖励", note: "" },
@@ -925,7 +953,7 @@
 
         function loadState() {
             try {
-                const raw = localStorage.getItem(STORAGE_KEY);
+                const raw = localStorage.getItem(storageKey());
                 if (raw) {
                     const p = JSON.parse(raw);
                     if (p.goals && p.tasks && p.rewards) {
@@ -939,7 +967,7 @@
         }
 
         function saveState() {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(S));
+            localStorage.setItem(storageKey(), JSON.stringify(S));
             if (cloudMode && !_skipCloudPush) {
                 clearTimeout(saveState._timer);
                 saveState._timer = setTimeout(() => cloudPush(), 2000);
@@ -947,7 +975,7 @@
         }
         saveState._timer = null;
 
-        let S = loadState();
+        let S = seedState(); // 初始空状态，登录后才加载真实数据
 
         /* --- 工具函数 --- */
         function esc(s) {
@@ -1806,29 +1834,54 @@
         function isLoggedIn() {
             try {
                 const s = JSON.parse(localStorage.getItem(SESSION_KEY));
-                return s && s.username && Date.now() < s.expiresAt;
-            } catch (_) { return false; }
+                if (s && s.username && Date.now() < s.expiresAt) {
+                    currentUser = s.username;
+                    return true;
+                }
+            } catch (_) { }
+            return false;
         }
         function doLogin() {
-            const u = $("login-email").value.trim(), p = $("login-password").value;
-            if (u === AUTH.username && p === AUTH.password) {
-                const days = $("login-remember").checked ? 30 : 1;
-                localStorage.setItem(SESSION_KEY, JSON.stringify({ username: u, expiresAt: Date.now() + days * 864e5 }));
-                $("loginMsg").textContent = "";
-                S = loadState(); // 重新加载本地数据
-                showMain();
-            } else {
-                $("loginMsg").textContent = "账号或密码错误";
-                $("loginMsg").style.color = "var(--danger)";
-            }
+            const u = $("login-username").value.trim();
+            if (!u) { $("loginMsg").textContent = "请输入用户名"; $("loginMsg").style.color = "var(--danger)"; return; }
+            const days = $("login-remember").checked ? 30 : 1;
+            currentUser = u;
+            localStorage.setItem(SESSION_KEY, JSON.stringify({ username: u, expiresAt: Date.now() + days * 864e5 }));
+            $("loginMsg").textContent = "";
+            S = loadState();
+            showMain();
         }
-        function showMain() { $("loginPanel").classList.add("hidden"); $("mainPanel").classList.remove("hidden"); refreshAll(); }
-        function showLogin() { $("mainPanel").classList.add("hidden"); $("loginPanel").classList.remove("hidden"); }
+        function loginAsUser(username) {
+            $("login-username").value = username;
+            doLogin();
+        }
+        window.loginAsUser = loginAsUser;
+        function renderLocalUsers() {
+            const users = getLocalUsers();
+            const el = $("localUserList");
+            if (!users.length) { el.innerHTML = ""; return; }
+            el.innerHTML = `<p class="muted" style="font-size:11px;margin-bottom:4px;">已有本地用户（点击快速进入）：</p>` +
+                users.map(u => `<button onclick="loginAsUser('${esc(u)}')" class="secondary" style="padding:4px 10px;font-size:12px;margin:2px 4px 2px 0;">${esc(u)}</button>`).join("");
+        }
+        function showMain() {
+            $("loginPanel").classList.add("hidden");
+            $("mainPanel").classList.remove("hidden");
+            /* 显示当前用户名 */
+            const userLabel = $("currentUserLabel");
+            if (userLabel) userLabel.textContent = currentUser || "";
+            refreshAll();
+        }
+        function showLogin() {
+            $("mainPanel").classList.add("hidden");
+            $("loginPanel").classList.remove("hidden");
+            renderLocalUsers();
+        }
         async function logout() {
             localStorage.removeItem(SESSION_KEY);
             if (cloudMode) await cloudLogout();
-            // 清理 Supabase SDK 遗留的 localStorage keys
             Object.keys(localStorage).filter(k => k.startsWith("sb-")).forEach(k => localStorage.removeItem(k));
+            currentUser = null;
+            S = seedState();
             showLogin();
         }
 
@@ -1842,7 +1895,7 @@
 
         /* 事件绑定 */
         $("login-btn").addEventListener("click", doLogin);
-        $("login-password").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
+        $("login-username").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
         $("btnLogout").addEventListener("click", () => logout());
 
         /* Supabase 配置 */
@@ -1957,17 +2010,236 @@
                         if (data.session) {
                             cloudMode = true;
                             cloudUserId = data.session.user.id;
+                            currentUser = "cloud_" + data.session.user.id.slice(0, 8);
                             cloudSessionFound = true;
                             await cloudPull();
                             showMain();
                         }
-                    } catch (_) {}
+                    } catch (_) { }
                 }
             }
             if (!cloudSessionFound) {
-                if (isLoggedIn()) showMain(); else showLogin();
+                if (isLoggedIn()) {
+                    S = loadState();
+                    showMain();
+                } else {
+                    showLogin();
+                }
             }
         })();
+
+        /* ===================================================
+           SDP — 全局 API（供 OpenClaw Agent 直接调用）
+           Agent 通过 SDP.xxx() 即可操作数据，无需模拟 DOM
+           所有写操作自动 saveState() + refreshAll()
+           =================================================== */
+        window.SDP = {
+            /* ---- 状态查询 ---- */
+            getStatus() {
+                const { earned, spent, balance } = totals();
+                const today = todayStr();
+                const todayPts = (S.pointsLog || []).filter(l => (l.type === "earn" || l.type === "manual" || l.type === "milestone") && l.time && l.time.startsWith(today)).reduce((s, l) => s + l.points, 0);
+                return {
+                    user: currentUser,
+                    balance, earned, spent, todayEarned: todayPts,
+                    goals: S.goals.filter(g => !g.archived).map(g => ({ id: g.id, name: g.name, tag: g.tag, progress: g.progress, milestone: g.milestone })),
+                    activeTasks: S.tasks.filter(t => !t.archived && t.status !== "已挂起").map(t => ({
+                        id: t.id, title: t.title, priority: t.priority, status: t.status,
+                        progress: t.progress, basePoints: t.basePoints,
+                        goalId: t.goalId, deadline: t.deadline
+                    })),
+                    suspendedTasks: S.tasks.filter(t => !t.archived && t.status === "已挂起").map(t => ({ id: t.id, title: t.title })),
+                    redeemable: S.rewards.filter(r => balance >= r.cost && r.stock > r.redeemedCount).map(r => ({ id: r.id, name: r.name, cost: r.cost }))
+                };
+            },
+
+            /* ---- 目标 CRUD ---- */
+            addGoal({ name, tag = "", milestone = 0, progress = 0 }) {
+                if (!name) return { error: "name is required" };
+                const g = { id: uid(), name, tag, milestone: Number(milestone), progress: Number(progress) };
+                S.goals.push(g);
+                saveState(); refreshAll();
+                return { ok: true, goal: g };
+            },
+            updateGoal(id, updates) {
+                const g = S.goals.find(x => x.id === id);
+                if (!g) return { error: "goal not found" };
+                if (updates.name !== undefined) g.name = updates.name;
+                if (updates.tag !== undefined) g.tag = updates.tag;
+                if (updates.milestone !== undefined) g.milestone = Number(updates.milestone);
+                if (updates.progress !== undefined) {
+                    g.progress = Math.min(100, Math.max(0, Number(updates.progress)));
+                    saveState(); checkGoalCelebration(id);
+                }
+                saveState(); refreshAll();
+                return { ok: true, goal: g };
+            },
+            deleteGoal(id) {
+                const idx = S.goals.findIndex(x => x.id === id);
+                if (idx === -1) return { error: "goal not found" };
+                S.goals.splice(idx, 1);
+                S.tasks.forEach(t => { if (t.goalId === id) t.goalId = ""; });
+                saveState(); refreshAll();
+                return { ok: true };
+            },
+            archiveGoal(id) {
+                const g = S.goals.find(x => x.id === id);
+                if (!g) return { error: "goal not found" };
+                g.archived = true; g.archivedAt = new Date().toISOString();
+                saveState(); refreshAll();
+                return { ok: true };
+            },
+            listGoals(includeArchived = false) {
+                return includeArchived ? S.goals : S.goals.filter(g => !g.archived);
+            },
+
+            /* ---- 任务 CRUD ---- */
+            addTask({ title, goalId = "", priority = "P2", basePoints = 10, deadline = null, note = "", type = "normal" }) {
+                if (!title) return { error: "title is required" };
+                const t = {
+                    id: uid(), title, goalId, priority, status: "未开始", type,
+                    category: "general", duration: "30min", progress: 0,
+                    basePoints: Number(basePoints), weight: 1,
+                    deadline: deadline ? new Date(deadline).toISOString() : null,
+                    outputUrl: "", note, streak: 0, lastDoneDate: null,
+                    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+                };
+                S.tasks.push(t);
+                saveState(); refreshAll();
+                return { ok: true, task: t };
+            },
+            updateTask(id, updates) {
+                const t = S.tasks.find(x => x.id === id);
+                if (!t) return { error: "task not found" };
+                ["title", "goalId", "priority", "note", "outputUrl", "type"].forEach(k => {
+                    if (updates[k] !== undefined) t[k] = updates[k];
+                });
+                if (updates.basePoints !== undefined) t.basePoints = Number(updates.basePoints);
+                if (updates.progress !== undefined) t.progress = Math.min(100, Math.max(0, Number(updates.progress)));
+                if (updates.deadline !== undefined) t.deadline = updates.deadline ? new Date(updates.deadline).toISOString() : null;
+                t.updatedAt = new Date().toISOString();
+                saveState(); refreshAll();
+                return { ok: true, task: t };
+            },
+            markDone(id) {
+                const t = S.tasks.find(x => x.id === id);
+                if (!t) return { error: "task not found" };
+                markDone(id);
+                return { ok: true, points: calcActualPoints(t) };
+            },
+            suspendTask(id) {
+                const t = S.tasks.find(x => x.id === id);
+                if (!t) return { error: "task not found" };
+                suspendTask(id);
+                return { ok: true, status: t.status };
+            },
+            archiveTask(id) {
+                const t = S.tasks.find(x => x.id === id);
+                if (!t) return { error: "task not found" };
+                t.archived = true; t.archivedAt = new Date().toISOString();
+                saveState(); refreshAll();
+                return { ok: true };
+            },
+            deleteTask(id) {
+                const idx = S.tasks.findIndex(x => x.id === id);
+                if (idx === -1) return { error: "task not found" };
+                S.tasks.splice(idx, 1);
+                saveState(); refreshAll();
+                return { ok: true };
+            },
+            listTasks({ activeOnly = true, goalId = null } = {}) {
+                let tasks = activeOnly ? S.tasks.filter(t => !t.archived) : S.tasks;
+                if (goalId) tasks = tasks.filter(t => t.goalId === goalId);
+                return tasks;
+            },
+
+            /* ---- 积分操作 ---- */
+            addPoints(amount, reason = "手动加分") {
+                if (!amount || amount <= 0) return { error: "amount must be > 0" };
+                S.pointsLog.push({ time: new Date().toISOString(), taskId: null, taskTitle: reason, points: Number(amount), type: "manual" });
+                saveState(); refreshAll();
+                return { ok: true, balance: totals().balance };
+            },
+            getBalance() { return totals(); },
+
+            /* ---- 奖励兑换 ---- */
+            listRewards() { return S.rewards; },
+            addReward({ name, cost = 30, stock = 99, type = "即时奖励", note = "" }) {
+                if (!name) return { error: "name is required" };
+                const r = { id: uid(), name, cost: Number(cost), stock: Number(stock), redeemedCount: 0, type, note };
+                S.rewards.push(r);
+                saveState(); refreshAll();
+                return { ok: true, reward: r };
+            },
+            redeem(id) {
+                const r = S.rewards.find(x => x.id === id);
+                if (!r) return { error: "reward not found" };
+                const { balance } = totals();
+                if (balance < r.cost) return { error: `余额不足，还差 ${r.cost - balance} 分` };
+                if (r.stock <= r.redeemedCount) return { error: "库存不足" };
+                r.redeemedCount += 1;
+                S.redemptions.push({ id: uid(), rewardId: r.id, rewardName: r.name, cost: r.cost, at: new Date().toISOString() });
+                S.pointsLog.push({ time: new Date().toISOString(), taskId: null, taskTitle: `兑换: ${r.name}`, points: -r.cost, type: "spend" });
+                saveState(); refreshAll();
+                return { ok: true, balance: totals().balance };
+            },
+
+            /* ---- 报告 ---- */
+            genReport(type = "daily") {
+                if (type === "weekly") { genWeeklyReport(); } else { genDailyReport(); }
+                return $("reviewOutput").value;
+            },
+
+            /* ---- 批量操作 ---- */
+            batchAddTasks(taskList) {
+                if (!Array.isArray(taskList)) return { error: "taskList must be an array" };
+                const results = taskList.map(t => SDP.addTask(t));
+                return { ok: true, count: results.filter(r => r.ok).length, results };
+            },
+
+            /* ---- 导入导出 ---- */
+            exportData() { return JSON.parse(JSON.stringify(S)); },
+            importData(data) {
+                if (!data || !data.goals || !data.tasks || !data.rewards) return { error: "invalid data structure" };
+                S = data;
+                if (!S.pointsLog) S.pointsLog = [];
+                if (!S.redemptions) S.redemptions = [];
+                saveState(); refreshAll();
+                return { ok: true };
+            },
+
+            /* ---- 元信息 ---- */
+            help() {
+                return {
+                    description: "自律任务系统 API — OpenClaw Agent 通过 window.SDP 调用",
+                    methods: [
+                        "getStatus() — 获取全局状态摘要（余额、目标、活跃任务、可兑换奖励）",
+                        "addGoal({name, tag?, milestone?, progress?}) — 新建目标",
+                        "updateGoal(id, {name?, tag?, milestone?, progress?}) — 更新目标",
+                        "deleteGoal(id) — 删除目标",
+                        "archiveGoal(id) — 归档目标",
+                        "listGoals(includeArchived?) — 列出目标",
+                        "addTask({title, goalId?, priority?, basePoints?, deadline?, note?, type?}) — 新建任务",
+                        "updateTask(id, {title?, priority?, progress?, basePoints?, deadline?, note?}) — 更新任务",
+                        "markDone(id) — 完成任务并获取积分",
+                        "suspendTask(id) — 挂起/恢复任务",
+                        "archiveTask(id) — 归档任务",
+                        "deleteTask(id) — 删除任务",
+                        "listTasks({activeOnly?, goalId?}) — 列出任务",
+                        "addPoints(amount, reason?) — 手动加分",
+                        "getBalance() — 获取积分余额",
+                        "listRewards() — 列出奖励",
+                        "addReward({name, cost?, stock?, type?, note?}) — 新建奖励",
+                        "redeem(id) — 兑换奖励",
+                        "genReport('daily'|'weekly') — 生成并返回报告文本",
+                        "batchAddTasks([{title,...},...]) — 批量添加任务",
+                        "exportData() — 导出全部数据",
+                        "importData(data) — 导入数据",
+                        "help() — 显示此帮助信息"
+                    ]
+                };
+            }
+        };
     </script>
 </body>
 
