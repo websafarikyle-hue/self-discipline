@@ -781,6 +781,68 @@
             margin-top: 10px;
         }
 
+        .toolbar-grid {
+            display: grid;
+            gap: 8px;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            margin-bottom: 12px;
+        }
+
+        .hint-box {
+            padding: 12px 14px;
+            border-radius: 14px;
+            border: 1px solid rgba(148, 163, 184, 0.15);
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .drag-handle {
+            cursor: grab;
+            user-select: none;
+            color: var(--text-muted);
+            font-size: 14px;
+            padding: 4px 6px;
+            border-radius: 10px;
+            border: 1px dashed rgba(148, 163, 184, 0.18);
+        }
+
+        .habit-card.dragging {
+            opacity: 0.55;
+            border-color: rgba(87, 230, 194, 0.4);
+        }
+
+        .habit-card.drop-target {
+            outline: 1px solid rgba(255, 209, 102, 0.55);
+            transform: translateY(-1px);
+        }
+
+        .prompt-grid {
+            display: grid;
+            gap: 12px;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        }
+
+        .prompt-card {
+            min-height: 240px;
+        }
+
+        .prompt-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .prompt-output {
+            min-height: 150px;
+            white-space: pre-wrap;
+            line-height: 1.65;
+            font-size: 13px;
+        }
+
         @media (min-width: 900px) {
             .two-col-layout {
                 grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
@@ -1041,6 +1103,21 @@
                     <div>
                         <div class="card">
                             <h2>📚 习惯清单</h2>
+                            <div class="toolbar-grid">
+                                <select id="habit-group" data-testid="habit-select-group">
+                                    <option value="status">按完成状态</option>
+                                    <option value="priority">按优先级</option>
+                                    <option value="goal">按目标</option>
+                                    <option value="none">不分组</option>
+                                </select>
+                                <select id="habit-sort" data-testid="habit-select-sort">
+                                    <option value="custom">自定义排序</option>
+                                    <option value="streak">连击优先</option>
+                                    <option value="points">积分优先</option>
+                                    <option value="name">名称排序</option>
+                                </select>
+                            </div>
+                            <div id="habitSortHint" class="hint-box muted" data-testid="habit-sort-hint" style="margin-bottom:12px;"></div>
                             <div id="habitList" data-testid="habit-list" class="scroll-section"></div>
                         </div>
                     </div>
@@ -1108,6 +1185,7 @@
                     <h2>可兑换项</h2>
                     <div id="redeemable" data-testid="review-redeemable-list"></div>
                 </div>
+                <div class="prompt-grid" id="promptPanel" data-testid="review-prompt-panel"></div>
                 <div class="card">
                     <div class="row wrap between center" style="margin-bottom:8px;">
                         <h2 style="margin:0;">复盘报告</h2>
@@ -1194,7 +1272,7 @@
             cloudUserId = data.user.id;
             currentUser = "cloud_" + data.user.id.slice(0, 8);
             await cloudPull();
-            if (ensureDefaultHabits()) saveState();
+            if (initializeDefaultHabits()) saveState();
             return true;
         }
 
@@ -1228,7 +1306,7 @@
                 try {
                     const cloudData = JSON.parse(data.data);
                     if (!cloudData.goals || !cloudData.tasks || !cloudData.rewards) return;
-                    S = cloudData;
+                    S = ensureStateShape(cloudData);
                     if (!S.pointsLog) S.pointsLog = [];
                     if (!S.redemptions) S.redemptions = [];
                     _skipCloudPush = true;
@@ -1294,9 +1372,41 @@
             { title: "小红书出差感想发布", priority: "P2", basePoints: 2, cue: "晚间复盘前", duration: "15min", note: "发布一条内容即可打卡" },
             { title: "戒", priority: "P2", basePoints: 5, cue: "全天", duration: "全天", note: "坚持克制，全天达标后再打卡" }
         ];
+        const DEFAULT_HABITS_VERSION = 1;
 
         function seedState() {
-            return { goals: [], tasks: [], rewards: structuredClone(DEFAULT_REWARDS), redemptions: [], pointsLog: [] };
+            return {
+                goals: [],
+                tasks: [],
+                rewards: structuredClone(DEFAULT_REWARDS),
+                redemptions: [],
+                pointsLog: [],
+                meta: {
+                    defaultHabitsInitialized: false,
+                    defaultHabitsVersion: 0,
+                    morningPromptDate: "",
+                    eveningPromptDate: ""
+                },
+                settings: {
+                    habitGroupBy: "status",
+                    habitSortBy: "custom"
+                }
+            };
+        }
+
+        function ensureStateShape(state) {
+            if (!state.meta) state.meta = {};
+            if (!state.settings) state.settings = {};
+            if (typeof state.meta.defaultHabitsInitialized !== "boolean") state.meta.defaultHabitsInitialized = false;
+            if (!state.meta.defaultHabitsVersion) state.meta.defaultHabitsVersion = 0;
+            if (!state.meta.morningPromptDate) state.meta.morningPromptDate = "";
+            if (!state.meta.eveningPromptDate) state.meta.eveningPromptDate = "";
+            if (!state.settings.habitGroupBy) state.settings.habitGroupBy = "status";
+            if (!state.settings.habitSortBy) state.settings.habitSortBy = "custom";
+            state.tasks.forEach((t, idx) => {
+                if (t.type === "habit" && typeof t.habitOrder !== "number") t.habitOrder = idx + 1;
+            });
+            return state;
         }
 
         function uid() { return crypto.randomUUID().slice(0, 8); }
@@ -1309,11 +1419,11 @@
                     if (p.goals && p.tasks && p.rewards) {
                         if (!p.redemptions) p.redemptions = [];
                         if (!p.pointsLog) p.pointsLog = [];
-                        return p;
+                        return ensureStateShape(p);
                     }
                 }
             } catch (_) { }
-            return seedState();
+            return ensureStateShape(seedState());
         }
 
         function saveState() {
@@ -1331,36 +1441,65 @@
             return !!(t && t.type === "habit" && t.lastDoneDate === todayStr());
         }
 
-        function ensureDefaultHabits() {
-            const habitTitles = new Set(S.tasks.filter(t => t.type === "habit" && !t.archived).map(t => t.title));
-            const shouldSeed = habitTitles.size === 0 || DEFAULT_HABITS.some(h => !habitTitles.has(h.title));
-            if (!shouldSeed) return false;
+        function addDefaultHabitTemplate(h, orderBase) {
+            S.tasks.push({
+                id: uid(),
+                title: h.title,
+                goalId: "",
+                priority: h.priority,
+                status: "未开始",
+                type: "habit",
+                category: "habit",
+                duration: h.duration,
+                cue: h.cue,
+                progress: 0,
+                basePoints: h.basePoints,
+                weight: 1,
+                habitOrder: orderBase,
+                deadline: null,
+                outputUrl: "",
+                note: h.note,
+                streak: 0,
+                lastDoneDate: null,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            });
+        }
+
+        function initializeDefaultHabits() {
+            ensureStateShape(S);
+            if (S.meta.defaultHabitsInitialized) return false;
+            const existingHabits = S.tasks.filter(t => t.type === "habit");
+            if (existingHabits.length === 0) {
+                DEFAULT_HABITS.forEach((h, idx) => addDefaultHabitTemplate(h, idx + 1));
+            }
+            S.meta.defaultHabitsInitialized = true;
+            S.meta.defaultHabitsVersion = DEFAULT_HABITS_VERSION;
+            return true;
+        }
+
+        function ensureDefaultHabits(force = false) {
+            ensureStateShape(S);
+            const habitTitles = new Set(S.tasks.filter(t => t.type === "habit").map(t => t.title));
+            if (!force) return initializeDefaultHabits();
             let changed = false;
+            let nextOrder = S.tasks.filter(t => t.type === "habit").reduce((max, t) => Math.max(max, Number(t.habitOrder || 0)), 0) + 1;
             DEFAULT_HABITS.forEach(h => {
-                if (habitTitles.has(h.title)) return;
-                S.tasks.push({
-                    id: uid(),
-                    title: h.title,
-                    goalId: "",
-                    priority: h.priority,
-                    status: "未开始",
-                    type: "habit",
-                    category: "habit",
-                    duration: h.duration,
-                    cue: h.cue,
-                    progress: 0,
-                    basePoints: h.basePoints,
-                    weight: 1,
-                    deadline: null,
-                    outputUrl: "",
-                    note: h.note,
-                    streak: 0,
-                    lastDoneDate: null,
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString()
-                });
+                const existing = S.tasks.find(t => t.type === "habit" && t.title === h.title);
+                if (existing) {
+                    if (existing.archived) {
+                        existing.archived = false;
+                        existing.archivedAt = null;
+                        if (typeof existing.habitOrder !== "number") existing.habitOrder = nextOrder++;
+                        changed = true;
+                    }
+                    return;
+                }
+                addDefaultHabitTemplate(h, nextOrder++);
                 changed = true;
             });
+            S.meta.defaultHabitsInitialized = true;
+            S.meta.defaultHabitsVersion = DEFAULT_HABITS_VERSION;
             return changed;
         }
 
@@ -1652,6 +1791,7 @@
            Step 4: 任务清单 CRUD + 渲染 + 打卡连签 + 快速添加
            =================================================== */
         let taskSubView = "all"; // "all" | "p01" | "bygoal"
+        let draggedHabitId = null;
 
         function renderTasks() {
             const container = $("taskListContainer");
@@ -1836,9 +1976,16 @@
         }
 
         function renderHabits() {
-            const habits = S.tasks.filter(t => !t.archived && t.type === "habit").sort((a, b) => a.priority.localeCompare(b.priority) || a.title.localeCompare(b.title, "zh-CN"));
+            ensureStateShape(S);
+            const groupBy = S.settings.habitGroupBy || "status";
+            const sortBy = S.settings.habitSortBy || "custom";
+            const habits = sortHabits(S.tasks.filter(t => !t.archived && t.type === "habit"), sortBy);
             const archived = S.tasks.filter(t => t.archived && t.type === "habit");
-            $("habitList").innerHTML = habits.length ? habits.map(renderHabitCard).join("") : '<p class="muted">暂无习惯，先创建一个常驻动作吧。</p>';
+            $("habitSortHint").innerHTML = sortBy === "custom" && groupBy === "none"
+                ? "当前为自定义排序，可直接拖拽习惯卡片调整顺序。"
+                : "支持按状态 / 优先级 / 目标分组；切换到“不分组 + 自定义排序”时可拖拽重排。";
+
+            $("habitList").innerHTML = habits.length ? renderHabitGroups(habits, groupBy, sortBy) : '<p class="muted">暂无习惯，先创建一个常驻动作吧。</p>';
             if (archived.length) {
                 $("habitList").innerHTML += `<div class="group-header" style="cursor:pointer;" onclick="document.getElementById('archivedHabits').classList.toggle('hidden')">📦 已归档习惯 (${archived.length}) ▾</div><div id="archivedHabits" class="hidden">${archived.map(renderHabitCard).join("")}</div>`;
             }
@@ -1856,21 +2003,61 @@
             `;
         }
 
-        function renderHabitCard(t) {
+        function sortHabits(habits, sortBy) {
+            const list = habits.slice();
+            if (sortBy === "streak") return list.sort((a, b) => Number(b.streak || 0) - Number(a.streak || 0) || a.title.localeCompare(b.title, "zh-CN"));
+            if (sortBy === "points") return list.sort((a, b) => Number(b.basePoints || 0) - Number(a.basePoints || 0) || a.title.localeCompare(b.title, "zh-CN"));
+            if (sortBy === "name") return list.sort((a, b) => a.title.localeCompare(b.title, "zh-CN"));
+            return list.sort((a, b) => Number(a.habitOrder || 0) - Number(b.habitOrder || 0) || a.title.localeCompare(b.title, "zh-CN"));
+        }
+
+        function habitGroupLabel(groupBy, key, habits) {
+            if (groupBy === "priority") return `${key} (${habits.length})`;
+            if (groupBy === "goal") return `🎯 ${key} (${habits.length})`;
+            if (groupBy === "status") return `${key === "done" ? "✅ 今日已完成" : "⏳ 今日待完成"} (${habits.length})`;
+            return "";
+        }
+
+        function renderHabitGroups(habits, groupBy, sortBy) {
+            if (groupBy === "none") return habits.map(h => renderHabitCard(h, sortBy)).join("");
+            const groups = {};
+            habits.forEach(h => {
+                let key = "other";
+                if (groupBy === "priority") key = h.priority || "P2";
+                if (groupBy === "goal") key = h.goalId ? (S.goals.find(g => g.id === h.goalId)?.name || "未关联目标") : "未关联目标";
+                if (groupBy === "status") key = isHabitDoneToday(h) ? "done" : "pending";
+                (groups[key] = groups[key] || []).push(h);
+            });
+            let order = Object.keys(groups);
+            if (groupBy === "priority") order = ["P0", "P1", "P2", "P3"].filter(k => groups[k]);
+            if (groupBy === "status") order = ["pending", "done"].filter(k => groups[k]);
+            if (groupBy === "goal") order = order.sort((a, b) => a.localeCompare(b, "zh-CN"));
+            return order.map(key => `<div class="group-header">${habitGroupLabel(groupBy, key, groups[key])}</div>${groups[key].map(h => renderHabitCard(h, sortBy)).join("")}`).join("");
+        }
+
+        function renderHabitCard(t, sortBy = S.settings.habitSortBy || "custom") {
             const goal = S.goals.find(g => g.id === t.goalId);
             const goalName = goal ? goal.name : "未关联目标";
             const doneToday = isHabitDoneToday(t);
             const statusText = doneToday ? "今日已打卡" : "今日待打卡";
             const statusClass = doneToday ? "done" : "pending";
+            const draggable = !t.archived && sortBy === "custom" && (S.settings.habitGroupBy || "status") === "none";
             const actionHtml = t.archived
                 ? `<button data-testid="habit-btn-restore-${t.id}" onclick="restoreTask('${t.id}')" class="secondary" style="padding:6px 12px;font-size:12px;">恢复</button>`
                 : `<button data-testid="habit-btn-archive-${t.id}" onclick="archiveTask('${t.id}')" class="danger" style="padding:6px 12px;font-size:12px;">归档</button>`;
             const primaryAction = t.archived
                 ? ""
                 : `<button data-testid="habit-btn-done-${t.id}" onclick="markDone('${t.id}')" class="ok-btn" style="padding:6px 12px;font-size:12px;">${doneToday ? "已完成" : "今日打卡"}</button>`;
-            return `<div class="item-card" data-testid="habit-card-${t.id}">
+            return `<div class="item-card habit-card" data-testid="habit-card-${t.id}" draggable="${draggable ? "true" : "false"}"
+                ondragstart="${draggable ? `handleHabitDragStart(event,'${t.id}')` : ""}"
+                ondragover="${draggable ? "handleHabitDragOver(event)" : ""}"
+                ondrop="${draggable ? `handleHabitDrop(event,'${t.id}')` : ""}"
+                ondragend="${draggable ? "handleHabitDragEnd(event)" : ""}">
                 <div class="row between center wrap habit-card-head">
-                    <strong>${esc(t.title)}</strong>
+                    <div class="row center wrap" style="gap:8px;">
+                        ${draggable ? '<span class="drag-handle" title="拖拽排序">⋮⋮</span>' : ""}
+                        <strong>${esc(t.title)}</strong>
+                    </div>
                     <div class="row wrap center" style="gap:6px;">
                         <span class="streak-badge">🔥 ${Number(t.streak || 0)}天</span>
                         <span class="pill ${doneToday ? "pill-ok" : "pill-warn"}">${statusText}</span>
@@ -1893,10 +2080,56 @@
             </div>`;
         }
 
+        function resequenceHabits() {
+            const habits = S.tasks.filter(t => t.type === "habit" && !t.archived)
+                .sort((a, b) => Number(a.habitOrder || 0) - Number(b.habitOrder || 0));
+            habits.forEach((h, idx) => { h.habitOrder = idx + 1; });
+        }
+
+        function moveHabitBefore(dragId, targetId) {
+            if (!dragId || !targetId || dragId === targetId) return;
+            const activeHabits = S.tasks.filter(t => t.type === "habit" && !t.archived)
+                .sort((a, b) => Number(a.habitOrder || 0) - Number(b.habitOrder || 0));
+            const dragIdx = activeHabits.findIndex(h => h.id === dragId);
+            const targetIdx = activeHabits.findIndex(h => h.id === targetId);
+            if (dragIdx === -1 || targetIdx === -1) return;
+            const [dragged] = activeHabits.splice(dragIdx, 1);
+            activeHabits.splice(targetIdx, 0, dragged);
+            activeHabits.forEach((h, idx) => { h.habitOrder = idx + 1; h.updatedAt = new Date().toISOString(); });
+            saveState();
+            renderHabits();
+        }
+
+        function handleHabitDragStart(event, id) {
+            draggedHabitId = id;
+            event.dataTransfer.effectAllowed = "move";
+            event.currentTarget.classList.add("dragging");
+        }
+
+        function handleHabitDragOver(event) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "move";
+            event.currentTarget.classList.add("drop-target");
+        }
+
+        function handleHabitDrop(event, targetId) {
+            event.preventDefault();
+            event.currentTarget.classList.remove("drop-target");
+            moveHabitBefore(draggedHabitId, targetId);
+        }
+
+        function handleHabitDragEnd(event) {
+            draggedHabitId = null;
+            document.querySelectorAll(".habit-card").forEach(card => card.classList.remove("dragging", "drop-target"));
+            if (event && event.currentTarget) event.currentTarget.classList.remove("dragging");
+        }
+
         function saveHabit() {
             const id = $("habit-edit-id").value;
             const title = $("habit-title").value.trim();
             if (!title) { toast("习惯名称不能为空", "warn"); return; }
+            ensureStateShape(S);
+            const nextOrder = S.tasks.filter(t => t.type === "habit").reduce((max, t) => Math.max(max, Number(t.habitOrder || 0)), 0) + 1;
             const data = {
                 title,
                 goalId: $("habit-goal").value,
@@ -1918,7 +2151,7 @@
                 if (habit) Object.assign(habit, data, { updatedAt: new Date().toISOString() });
                 toast("习惯已更新");
             } else {
-                S.tasks.push({ id: uid(), ...data, streak: 0, lastDoneDate: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+                S.tasks.push({ id: uid(), ...data, habitOrder: nextOrder, streak: 0, lastDoneDate: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
                 toast("习惯已添加");
             }
             clearHabitForm();
@@ -2070,6 +2303,10 @@
         window.archiveTask = archiveTask;
         window.restoreTask = restoreTask;
         window.editHabit = editHabit;
+        window.handleHabitDragStart = handleHabitDragStart;
+        window.handleHabitDragOver = handleHabitDragOver;
+        window.handleHabitDrop = handleHabitDrop;
+        window.handleHabitDragEnd = handleHabitDragEnd;
 
         /* ===================================================
            Step 5: 补给站 渲染 + 兑换
@@ -2231,6 +2468,100 @@
             ).join("");
         }
 
+        function currentHour() {
+            return new Date().getHours();
+        }
+
+        function morningPromptText() {
+            const today = todayStr();
+            const overdue = S.tasks.filter(t => !t.archived && t.type !== "habit" && t.deadline && getTimeWindow(t.deadline) === "05_已逾期");
+            const todayTasks = S.tasks.filter(t => !t.archived && t.type !== "habit" && getTimeWindow(t.deadline) === "01_今天")
+                .sort((a, b) => a.priority.localeCompare(b.priority));
+            const topTasks = (todayTasks.length ? todayTasks : S.tasks.filter(t => !t.archived && t.type !== "habit" && t.status !== "已封包(Done)"))
+                .slice(0, 3);
+            const pendingHabits = S.tasks.filter(t => !t.archived && t.type === "habit" && !isHabitDoneToday(t));
+            const { balance } = totals();
+            const lines = [
+                `☀️ 早间启动 | ${today}`,
+                `余额积分：${balance}`,
+                `今日先手：`,
+                ...(topTasks.length ? topTasks.map(t => `- ${t.priority} | ${t.title}`) : ["- 今天没有待办，适合主动推进长期项目"]),
+                `习惯提醒：`,
+                ...(pendingHabits.length ? pendingHabits.slice(0, 4).map(h => `- ${h.title} (${h.basePoints}分)`) : ["- 今日习惯已全部完成"]),
+                overdue.length ? `逾期任务：${overdue.length} 个，优先清理。` : `逾期任务：0，节奏不错。`
+            ];
+            return lines.join("\n");
+        }
+
+        function eveningPromptText() {
+            const today = todayStr();
+            const doneTasks = S.tasks.filter(t => t.type !== "habit" && t.status === "已封包(Done)" && t.updatedAt && t.updatedAt.startsWith(today));
+            const doneHabits = S.tasks.filter(t => t.type === "habit" && t.lastDoneDate === today);
+            const pendingHabits = S.tasks.filter(t => !t.archived && t.type === "habit" && !isHabitDoneToday(t));
+            const todayPoints = (S.pointsLog || []).filter(l => (l.type === "earn" || l.type === "manual" || l.type === "milestone") && l.time && l.time.startsWith(today)).reduce((s, l) => s + Number(l.points || 0), 0);
+            const tomorrowTasks = S.tasks.filter(t => !t.archived && t.type !== "habit" && getTimeWindow(t.deadline) === "02_明天")
+                .sort((a, b) => a.priority.localeCompare(b.priority))
+                .slice(0, 3);
+            const lines = [
+                `🌙 晚间复盘 | ${today}`,
+                `今日积分：+${todayPoints}`,
+                `完成任务：${doneTasks.length} 个`,
+                ...(doneTasks.length ? doneTasks.map(t => `- ${t.title}`) : ["- 今天还没有完成普通任务"]),
+                `习惯打卡：${doneHabits.length} / ${S.tasks.filter(t => !t.archived && t.type === "habit").length}`,
+                pendingHabits.length ? `仍待打卡：${pendingHabits.map(h => h.title).join("、")}` : `习惯页已清空，适合收尾休息。`,
+                `明日前瞻：`,
+                ...(tomorrowTasks.length ? tomorrowTasks.map(t => `- ${t.priority} | ${t.title}`) : ["- 明天暂时没有硬截止，留出主动规划空间"])
+            ];
+            return lines.join("\n");
+        }
+
+        function copyText(text, okMsg = "已复制到剪贴板") {
+            navigator.clipboard.writeText(text).then(() => toast(okMsg)).catch(() => toast("复制失败，请手动复制", "warn"));
+        }
+
+        function markPromptUsed(kind) {
+            ensureStateShape(S);
+            const key = kind === "morning" ? "morningPromptDate" : "eveningPromptDate";
+            S.meta[key] = todayStr();
+            saveState();
+            renderPromptPanel();
+        }
+
+        function renderPromptPanel() {
+            ensureStateShape(S);
+            const hour = currentHour();
+            const morningActive = hour >= 6 && hour < 12;
+            const eveningActive = hour >= 20 || hour < 2;
+            const morningText = morningPromptText();
+            const eveningText = eveningPromptText();
+            $("promptPanel").innerHTML = `
+                <div class="card prompt-card">
+                    <div class="row between center wrap" style="margin-bottom:10px;">
+                        <h2 style="margin:0;">☀️ 晨间启动</h2>
+                        <span class="prompt-badge" style="color:${morningActive ? "var(--accent3)" : "var(--text-muted)"};">${morningActive ? "当前推荐" : "可提前预览"}</span>
+                    </div>
+                    <div class="prompt-output" data-testid="prompt-morning-output">${esc(morningText)}</div>
+                    <div class="row wrap" style="margin-top:10px;">
+                        <button class="secondary" onclick='copyText(morningPromptText(), "晨间提示已复制")'>复制晨间提示</button>
+                        <button class="secondary" onclick='markPromptUsed("morning")'>标记已使用</button>
+                    </div>
+                    <p class="muted" style="margin-top:8px;font-size:12px;">最近使用：${S.meta.morningPromptDate || "尚未记录"}</p>
+                </div>
+                <div class="card prompt-card">
+                    <div class="row between center wrap" style="margin-bottom:10px;">
+                        <h2 style="margin:0;">🌙 晚间复盘</h2>
+                        <span class="prompt-badge" style="color:${eveningActive ? "var(--accent2)" : "var(--text-muted)"};">${eveningActive ? "当前推荐" : "可提前预览"}</span>
+                    </div>
+                    <div class="prompt-output" data-testid="prompt-evening-output">${esc(eveningText)}</div>
+                    <div class="row wrap" style="margin-top:10px;">
+                        <button class="secondary" onclick='copyText(eveningPromptText(), "晚间提示已复制")'>复制晚间提示</button>
+                        <button class="secondary" onclick='markPromptUsed("evening")'>标记已使用</button>
+                    </div>
+                    <p class="muted" style="margin-top:8px;font-size:12px;">最近使用：${S.meta.eveningPromptDate || "尚未记录"}</p>
+                </div>
+            `;
+        }
+
         function genDailyReport() {
             const { earned, spent, balance } = totals();
             const today = todayStr();
@@ -2317,8 +2648,14 @@
             renderReviewKpis();
             renderPointsLog();
             renderRedeemable();
+            renderPromptPanel();
             $("jsonOutput").value = JSON.stringify(S, null, 2);
         }
+
+        window.copyText = copyText;
+        window.morningPromptText = morningPromptText;
+        window.eveningPromptText = eveningPromptText;
+        window.markPromptUsed = markPromptUsed;
 
         /* 导入导出 */
         function exportJson() {
@@ -2336,10 +2673,10 @@
                 try {
                     const data = JSON.parse(reader.result);
                     if (!data.goals || !data.tasks || !data.rewards) throw new Error("结构不正确");
-                    S = data;
+                    S = ensureStateShape(data);
                     if (!S.pointsLog) S.pointsLog = [];
                     if (!S.redemptions) S.redemptions = [];
-                    if (ensureDefaultHabits()) saveState();
+                    initializeDefaultHabits();
                     saveState(); refreshAll();
                     toast("导入成功");
                 } catch (e) { toast("导入失败: " + e.message, "danger"); }
@@ -2370,7 +2707,10 @@
         }
 
         function refreshAll() {
+            ensureStateShape(S);
             refreshGoalSelects();
+            $("habit-group").value = S.settings.habitGroupBy || "status";
+            $("habit-sort").value = S.settings.habitSortBy || "custom";
             renderGoals();
             renderTasks();
             renderHabits();
@@ -2399,7 +2739,7 @@
             localStorage.setItem(SESSION_KEY, JSON.stringify({ username: u, expiresAt: Date.now() + days * 864e5 }));
             $("loginMsg").textContent = "";
             S = loadState();
-            if (ensureDefaultHabits()) saveState();
+            if (initializeDefaultHabits()) saveState();
             showMain();
         }
         function loginAsUser(username) {
@@ -2539,10 +2879,20 @@
 
         $("habit-save").addEventListener("click", saveHabit);
         $("habit-clear").addEventListener("click", clearHabitForm);
+        $("habit-group").addEventListener("change", e => {
+            S.settings.habitGroupBy = e.target.value;
+            saveState();
+            renderHabits();
+        });
+        $("habit-sort").addEventListener("change", e => {
+            S.settings.habitSortBy = e.target.value;
+            saveState();
+            renderHabits();
+        });
         $("habit-seed-btn").addEventListener("click", async () => {
-            const ok = await showModal("恢复默认习惯", "会补齐默认的 5 个习惯，不会覆盖你已经存在的同名习惯。");
+            const ok = await showModal("恢复默认习惯", "会补齐默认的 5 个习惯，不会覆盖你已经存在的同名习惯，也不会重置你已有的打卡数据。");
             if (!ok) return;
-            if (ensureDefaultHabits()) {
+            if (ensureDefaultHabits(true)) {
                 saveState();
                 renderHabits();
                 renderOverview();
@@ -2579,7 +2929,7 @@
                             currentUser = "cloud_" + data.session.user.id.slice(0, 8);
                             cloudSessionFound = true;
                             await cloudPull();
-                            if (ensureDefaultHabits()) saveState();
+                            if (initializeDefaultHabits()) saveState();
                             showMain();
                         }
                     } catch (_) { }
@@ -2588,7 +2938,7 @@
             if (!cloudSessionFound) {
                 if (isLoggedIn()) {
                     S = loadState();
-                    if (ensureDefaultHabits()) saveState();
+                    if (initializeDefaultHabits()) saveState();
                     showMain();
                 } else {
                     showLogin();
@@ -2668,10 +3018,13 @@
             /* ---- 任务 CRUD ---- */
             addTask({ title, goalId = "", priority = "P2", basePoints = 10, deadline = null, note = "", type = "normal", cue = "", duration = "30min" }) {
                 if (!title) return { error: "title is required" };
+                ensureStateShape(S);
+                const nextHabitOrder = S.tasks.filter(t => t.type === "habit").reduce((max, t) => Math.max(max, Number(t.habitOrder || 0)), 0) + 1;
                 const t = {
                     id: uid(), title, goalId, priority, status: "未开始", type,
                     category: type === "habit" ? "habit" : "general", duration, cue, progress: 0,
                     basePoints: Number(basePoints), weight: 1,
+                    habitOrder: type === "habit" ? nextHabitOrder : null,
                     deadline: deadline ? new Date(deadline).toISOString() : null,
                     outputUrl: "", note, streak: 0, lastDoneDate: null,
                     createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
@@ -2728,7 +3081,7 @@
                 return (includeArchived ? S.tasks : S.tasks.filter(t => !t.archived)).filter(t => t.type === "habit");
             },
             ensureDefaultHabits() {
-                const changed = ensureDefaultHabits();
+                const changed = ensureDefaultHabits(true);
                 if (changed) {
                     saveState(); refreshAll();
                 }
